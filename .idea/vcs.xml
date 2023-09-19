@@ -2,5 +2,10 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/Eigen" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/GLFW" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/GoogleTest" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/IMGUI" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/TaskFlow" vcs="Git" />
   </component>
 </project>

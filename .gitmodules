@@ -1,3 +1,15 @@
 [submodule "external/Eigen"]
 	path = external/Eigen
 	url = https://github.com/libigl/eigen
+[submodule "external/TaskFlow"]
+	path = external/TaskFlow
+	url = https://github.com/taskflow/taskflow
+[submodule "external/GoogleTest"]
+	path = external/GoogleTest
+	url = https://github.com/google/googletest
+[submodule "external/GLFW"]
+	path = external/GLFW
+	url = https://github.com/glfw/glfw
+[submodule "external/IMGUI"]
+	path = external/IMGUI
+	url = https://github.com/ocornut/imgui
