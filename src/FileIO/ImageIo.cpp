@@ -15,5 +15,6 @@ namespace EngiGraph {
     Image<uint32_t> readImage(const std::string& file){
         throw std::invalid_argument("File not found");
     }
+    //todo finish
 
 } // EngiGraph

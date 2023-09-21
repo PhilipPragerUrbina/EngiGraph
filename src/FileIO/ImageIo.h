@@ -19,6 +19,6 @@ namespace EngiGraph {
      */
     Image<uint32_t> readImage(const std::string& file);
 
-    //todo finish this
+    // todo finish this
 
 } // EngiGraph
