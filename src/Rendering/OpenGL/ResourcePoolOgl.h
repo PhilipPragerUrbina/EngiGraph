@@ -18,6 +18,7 @@ namespace EngiGraph {
          */
         struct OGLMesh{
             khronos_uint32_t vertex_array_id, vertex_buffer_id, element_buffer_id;
+            uint32_t indices_size;
             //todo add boolean checking if deallocated and throw error if accessing deallocated mesh.
         };
 

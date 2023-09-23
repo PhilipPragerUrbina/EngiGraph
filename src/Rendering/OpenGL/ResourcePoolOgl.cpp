@@ -34,7 +34,7 @@ namespace EngiGraph {
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VisualMesh::Vertex), (void*)offsetof(VisualMesh::Vertex, uv_coordinate));
 
         glBindVertexArray(0); //unbind
-
+        gpu_mesh.indices_size = cpu_mesh.indices.size();
         meshes.push_back(gpu_mesh);
         return meshes.size()-1;
     }
