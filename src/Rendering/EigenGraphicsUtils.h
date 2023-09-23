@@ -20,12 +20,12 @@ namespace EngiGraph {
 
     /**
      * Create a view matrix for a camera looking at a point.
-     * @param origin Camera position.
+     * @param eye Camera position.
      * @param target Where to look at.
-     * @param up Upward vector.
-     * @warning If origin == target or the camera direction == up, an identity matrix will be returned.
-     * @return View matrix.
+     * @param up Upward unit vector.
+     * @warning If origin == target or the camera direction == up, undefined behavior may occur.
+     * @return View matrix (inverse of lookAt matrix).
      */
-    Eigen::Matrix4f createLookAt(const Eigen::Vector3f& origin, const Eigen::Vector3f& target, const Eigen::Vector3f& up);
+    Eigen::Matrix4f createLookAtView(const Eigen::Vector3f& eye, const Eigen::Vector3f& target, const Eigen::Vector3f& up);
 
 } // EngiGraph
