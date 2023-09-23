@@ -15,6 +15,7 @@ TEST(UTILITY_TESTS, TEST_PROJECTION_MATRIX) {
             0 , 1.000000 , 0, 0,
             0 , 0 , -1.000200, -1.000000,
             0 , 0 , -0.200020, 0;
+    projection_expected.transposeInPlace(); //GLM is column major, but was printed as row major.
     for (int j = 0; j < 4; ++j) {
         for (int k = 0; k < 4; ++k) {
             ASSERT_FLOAT_EQ(projection_actual(j,k),projection_expected(j,k));
@@ -30,6 +31,7 @@ TEST(UTILITY_TESTS, TEST_VIEW_MATRIX) {
             0.000000 , 0.816496 , 0.577350 ,0.000000 ,
             -0.707107, -0.408248, 0.577350, 0.000000 ,
             -0.000000, -0.000000, -17.320505, 1.000000;
+    view_expected.transposeInPlace();//GLM is column major, but was printed as row major.
     for (int j = 0; j < 4; ++j) { //These values are not as clean as the last test, so a delta is used.
         for (int k = 0; k < 4; ++k) {
             ASSERT_NEAR(view_actual(j,k),view_expected(j,k), 0.001f);

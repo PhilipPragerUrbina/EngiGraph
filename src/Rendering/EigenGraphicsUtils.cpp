@@ -17,7 +17,7 @@ namespace EngiGraph {
         0 , y_scale , 0 , 0,
         0 , 0 , -(far_plane+near_plane)/(far_plane-near_plane), -1,
         0 , 0 , -2.0f*near_plane*far_plane/(far_plane-near_plane) , 0;
-
+        projection.transposeInPlace(); //entered in row major form, convert to column major
         return projection;
     }
 
@@ -34,6 +34,7 @@ namespace EngiGraph {
                 right_axis.y() , up_axis.y() , forward_axis.y() , 0,
                 right_axis.z() , up_axis.z() , forward_axis.z() , 0,
                 -(eye.dot(right_axis)) , -(eye.dot(up_axis)) , -(eye.dot(forward_axis)) , 1;
+        matrix.transposeInPlace(); //entered in row major form, convert to column major
         return matrix;
     }
 
