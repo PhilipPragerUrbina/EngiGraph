@@ -9,7 +9,7 @@
 namespace EngiGraph {
 
     /**
-     * Contains a triangular mesh with common attributes for rendering.
+     * Contains a mesh with common attributes for rendering.
      * @details Vertex position, UV coordinate, and normals.
      */
     struct VisualMesh {
@@ -20,35 +20,52 @@ namespace EngiGraph {
         std::string name;
 
         /**
-         * Local space positions of vertices.
+         * Single vertex structure for sequential memory layout.
          */
-        std::vector<Eigen::Vector3f> positions{};
-        /**
-         * Vertex normals, expected to be normalized.
-         */
-        std::vector<Eigen::Vector3f> normals{};
-        /**
-         * UV coordinates representing texture coordinates.
-         * @warning Not guaranteed to be in a specific range, wrapping is expected.
-         */
-        std::vector<Eigen::Vector2f> uv_coordinates{};
+        struct Vertex{
+            /**
+            * Local space position.
+            */
+            Eigen::Vector3f position;
+
+            /**
+             * Local space normal, expected to be unit vector.
+             */
+            Eigen::Vector3f normal;
+
+            /**
+             * UV coordinates representing texture coordinates.
+             * @warning Not guaranteed to be in a specific range, wrapping is expected.
+             */
+             Eigen::Vector2f uv_coordinate;
+
+        };
 
         /**
-         * Every 3 indices make up one triangle.
+         * Each vertex represents a point in the mesh.
+         */
+        std::vector<Vertex> vertices{};
+
+        /**
+         * Every n indices make up one face, usually 3 make up a triangle.
          */
         std::vector<uint32_t> indices{};
 
+        //todo index combining function
+        //todo check if any vertices are referenced by indices that are out of bounds
+        //todo check if any vertices can be removed since they are not referenced by indices.
+
         /**
          * Check if the mesh is a valid triangular mesh.
-         * All vertex attribute arrays must be the same size, and indices must form triangles.
-         * @return True if valid.
+         * @warning This does not strictly tell you if the mesh is 100% triangular(since it might have 6 sided faces), just that it can be rendered as a triangular mesh.
+         * @return True if indices are evenly divisible by 3.
          */
-        [[nodiscard]] bool validate() const {
-            return positions.size() == normals.size() && normals.size() == uv_coordinates.size() && indices.size() % 3 == 0;
+        [[nodiscard]] bool isTriangular() const {
+            return indices.size() % 3 == 0;
         }
 
         /**
-         * Get the number of triangles(faces) in the mesh.
+         * Get the number of triangles(3 index faces) in the mesh.
          */
         [[nodiscard]] size_t getTriangleCount() const {
             return indices.size() / 3;

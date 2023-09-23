@@ -13,9 +13,9 @@ TEST(LOADER_TESTS, TEST_OBJ_LOADER) {
     //test auto-generated normals
     Eigen::Vector3f total_norm(0,0,0);
     float total_magnitude = 0;
-    for (const auto& normal : meshes[0].normals) {
-        total_norm += normal;
-        total_magnitude += normal.norm();
+    for (const auto& vertex : meshes[0].vertices) {
+        total_norm += vertex.normal;
+        total_magnitude += vertex.normal.norm();
     }
     ASSERT_FLOAT_EQ(total_magnitude,36.0f); //the sum should be 36 since there is a normal for each 12 vertex in 3 directions.
     ASSERT_FLOAT_EQ(total_norm.norm(),0.0f); //the sum should be 0 since even faces cancel out.

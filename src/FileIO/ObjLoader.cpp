@@ -44,12 +44,14 @@ namespace EngiGraph {
 
                 for (size_t v = 0; v < 3; v++) {
 
+                    VisualMesh::Vertex vertex;
+
                     tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
 
                     tinyobj::real_t vx = attrib.vertices[3*size_t(idx.vertex_index)+0];
                     tinyobj::real_t vy = attrib.vertices[3*size_t(idx.vertex_index)+1];
                     tinyobj::real_t vz = attrib.vertices[3*size_t(idx.vertex_index)+2];
-                    mesh.positions.emplace_back(vx,vy,vz);
+                    vertex.position = {vx,vy,vz};
 
                     mesh.indices.push_back(index_offset + v); //This loader has per attribute indices, so there is no proper indexing scheme.
                     //todo separate mesh indexing function
@@ -58,8 +60,7 @@ namespace EngiGraph {
                         tinyobj::real_t nx = attrib.normals[3*size_t(idx.normal_index)+0];
                         tinyobj::real_t ny = attrib.normals[3*size_t(idx.normal_index)+1];
                         tinyobj::real_t nz = attrib.normals[3*size_t(idx.normal_index)+2];
-                        mesh.normals.emplace_back(nx,ny,nz);
-                        mesh.normals[mesh.normals.size()-1].normalize();
+                        vertex.normal = Eigen::Vector3f {nx,ny,nz}.normalized();
                     }else {
                         face_generate_normals = true;
                     }
@@ -67,32 +68,31 @@ namespace EngiGraph {
                     if (idx.texcoord_index >= 0 && !face_generate_texture_coords) {
                         tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
                         tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
-                        mesh.uv_coordinates.emplace_back(tx,ty);
+                        vertex.uv_coordinate = {tx, ty};
                     }else{
                         face_generate_texture_coords = true;
                     }
+                    mesh.vertices.push_back(vertex);
 
                 }
 
                 if(face_generate_normals){
                     //auto generates flat normals
-                    Eigen::Vector3f flat_normal = (mesh.positions[mesh.positions.size()-2] - mesh.positions[mesh.positions.size()-3]).cross(mesh.positions[mesh.positions.size()-3] - mesh.positions[mesh.positions.size()-1]);
+                    Eigen::Vector3f flat_normal = (mesh.vertices[mesh.vertices.size()-2].position - mesh.vertices[mesh.vertices.size()-3].position).cross(mesh.vertices[mesh.vertices.size()-3].position - mesh.vertices[mesh.vertices.size()-1].position);
                     flat_normal.normalize();
-                    mesh.normals.push_back(flat_normal);
-                    mesh.normals.push_back(flat_normal);
-                    mesh.normals.push_back(flat_normal);
+                    mesh.vertices[mesh.vertices.size()-3].normal = flat_normal;
+                    mesh.vertices[mesh.vertices.size()-2].normal = flat_normal;
+                    mesh.vertices[mesh.vertices.size()-1].normal = flat_normal;
                 }
                 if(face_generate_texture_coords){
-                    mesh.uv_coordinates.emplace_back(0,1);
-                    mesh.uv_coordinates.emplace_back(1,0);
-                    mesh.uv_coordinates.emplace_back(1,1);
+                    mesh.vertices[mesh.vertices.size()-3].uv_coordinate = {0,1};
+                    mesh.vertices[mesh.vertices.size()-2].uv_coordinate = {1,0};
+                    mesh.vertices[mesh.vertices.size()-1].uv_coordinate = {1,1};
                 }
                 index_offset += 3;
             }
             meshes.push_back(mesh);
-            if(!mesh.validate()){
-                throw RuntimeException("OBJ mesh data not valid : " + filename);
-            }
+           //todo run validation and cleanup here
         }
         return meshes;
     }
