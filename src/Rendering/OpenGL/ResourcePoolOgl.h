@@ -6,6 +6,8 @@
 #include "glad/glad.h"
 #include "../../Geometry/VisualMesh.h"
 #include "../../Exceptions/RuntimeException.h"
+#include "../../Image/Image.h"
+
 namespace EngiGraph {
 
     /**
@@ -23,9 +25,22 @@ namespace EngiGraph {
         };
 
         /**
+         * Contains info about gpu texture.
+         */
+        struct OGLTexture{
+            uint32_t width, height;
+            khronos_uint32_t texture_id;
+        };
+
+        /**
          * Simple ID corresponding to a mesh in GPU memory.
          */
         typedef uint32_t OGLMeshID;
+
+        /**
+        * Simple ID corresponding to a texture in GPU memory.
+        */
+        typedef uint32_t OGLTextureID;
 
         /**
          * Load a visual mesh into gpu memory.
@@ -34,6 +49,8 @@ namespace EngiGraph {
          * @return GPU resource id.
          */
         [[nodiscard]] OGLMeshID loadMesh(const VisualMesh& cpu_mesh);
+
+
 
         /**
          * Get an openGL mesh from a mesh id.
@@ -44,11 +61,30 @@ namespace EngiGraph {
         [[nodiscard]] OGLMesh getMesh(OGLMeshID id) const;
 
         /**
+        * Load a 4 channel 32 bit texture into gpu memory.
+        * @param cpu_texture Texture to load.
+        * @throws RuntimeException Issue loading texture.
+        * @return Texture resource id.
+        */
+        [[nodiscard]] OGLTextureID loadTexture(const Image<uint32_t>& cpu_image);
+
+
+
+        /**
+         * Get an openGL texture from a texture id.
+         * @param id Valid texture mesh id from loadTexture().
+         * @warning Asserts that id is valid.
+         * @return OpenGL texture information.
+         */
+        [[nodiscard]] OGLTexture getTexture(OGLTextureID id) const;
+
+        /**
          * Delete resources
          */
         ~ResourcePoolOGL();
     private:
         std::vector<OGLMesh> meshes;
+        std::vector<OGLTexture> textures;
     };
 
 } // EngiGraph

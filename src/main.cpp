@@ -43,7 +43,6 @@ int main(int, char**)
     renderer.addPipeLine(new EngiGraph::SurfaceNormalPipeLineOgl(camera));
     auto mesh = renderer.resource_pool.loadMesh(EngiGraph::loadOBJ("meshes/utah_teapot.obj")[0]);
 
-
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -84,6 +83,7 @@ int main(int, char**)
         }
         renderer.accessPipeLine<EngiGraph::SurfaceNormalPipeLineOgl>(0)->main_camera.setPosition(cam_pos);
         renderer.accessPipeLine<EngiGraph::SurfaceNormalPipeLineOgl>(0)->submitDrawCall(EngiGraph::SurfaceNormalPipeLineOgl::DrawCall{mesh   ,{Eigen::Matrix4f::Identity()}});
+
         auto frame_buffer = renderer.render(0);
 
         // Start the Dear ImGui frame
