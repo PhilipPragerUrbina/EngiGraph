@@ -20,7 +20,8 @@ namespace EngiGraph {
      * @param filename Location of file. Uppercase extensions will be converted to lowercase.
      * @param allowed_extensions List of allowed extensions with the '.', in lowercase. Putting an empty string here allows for folders.
      * @throws RuntimeException File does not match extensions.
+     * @return Matched extension as given in allowed extension list.
      */
-    void validateFileExtensions(const std::string& filename, const std::vector<std::string>& allowed_extensions);
+    std::string validateFileExtensions(const std::string& filename, const std::vector<std::string>& allowed_extensions);
 
 } // EngiGraph

@@ -12,12 +12,12 @@ namespace EngiGraph {
         if(!exists(path)) throw RuntimeException("Path: " + filename + " : does not exist.");
     }
 
-    void validateFileExtensions(const std::string &filename, const std::vector<std::string> &allowed_extensions) {
+    std::string validateFileExtensions(const std::string &filename, const std::vector<std::string> &allowed_extensions) {
         std::string extension = std::filesystem::path{filename}.extension().string();
         std::transform(extension.begin(), extension.end(), extension.begin(),[](unsigned char c){ return std::tolower(c); });
         for (const std::string& allowed_extension : allowed_extensions) {
             if(allowed_extension == extension){
-                return;
+                return allowed_extension;
             }
         }
         std::string list_allowed_extensions;

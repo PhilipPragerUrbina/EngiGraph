@@ -17,4 +17,5 @@ TEST(UTILITY_TESTS, TEST_FILE_VALIDATION) {
     } catch (const EngiGraph::RuntimeException& exception){
         ASSERT_STREQ(exception.what(), "Path: ./test_files/text.txt : does not match any of the following extensions : .obj .foobar .stl ");
     }
+    ASSERT_STREQ(EngiGraph::validateFileExtensions("./test_files/text.txt", {".obj",".foobar",".txt"}).c_str(), ".txt"); //returns correct value
 }
