@@ -49,7 +49,14 @@ namespace EngiGraph {
         void inline writePixel(uint16_t x, uint16_t y, const T& value){
             assert(x < width);
             assert(y < height);
-            data[y*width + x] = value;
+            data[x*width + y] = value;
+        }
+
+        /**
+         * Get the internal data buffer.
+         */
+        const std::vector<T>& getData() const {
+            return data;
         }
 
         /**
@@ -62,7 +69,7 @@ namespace EngiGraph {
         [[nodiscard]] inline T getPixel(uint16_t x, uint16_t y) const {
             assert(x < width);
             assert(y < height);
-            return data[y*width + x];
+            return data[x*width + y];
         }
     };
 

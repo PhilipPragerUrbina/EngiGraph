@@ -11,14 +11,14 @@
 namespace EngiGraph {
 
     /**
-     * Read an image off of the filesystem.
-     * @param file Path to image file with an extension.
+     * Read an RGBA image off of the filesystem.
+     * @param file Path to image file.
      * @note Supported formats: PNG, JPG/JPEG, TGA, BMP.
      * @return 8 bit RGBA image.
-     * @throws Invalid argument if unable to open the file.
+     * @throws RuntimeException if unable to open the file.
      */
     Image<uint32_t> readImage(const std::string& file);
 
-    // todo finish this
+    // todo image write
 
 } // EngiGraph
