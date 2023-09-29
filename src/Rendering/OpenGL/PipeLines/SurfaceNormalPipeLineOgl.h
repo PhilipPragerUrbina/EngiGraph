@@ -16,7 +16,7 @@ namespace EngiGraph {
     /**
      * Simple pipeline to visualize local vertex normals.
      */
-    class SurfaceNormalPipeLineOgl : public PipelineOGL<SurfaceNormalPipeLineDrawInfo> {
+    class SurfaceNormalPipeLineOgl : public PipelineOgl<SurfaceNormalPipeLineDrawInfo> {
     private:
         ShaderOGL shader{"shaders/normal_vertex.glsl", "shaders/normal_fragment.glsl"};
     protected:
