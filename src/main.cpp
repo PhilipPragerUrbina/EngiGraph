@@ -2,10 +2,11 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
-#include "Rendering/OpenGL/RenderContextOgl.h"
+#include "Rendering/OpenGL/PipeLines/SurfaceNormalPipeLineOgl.h"
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 #include "Rendering/OpenGL/PipeLines/SurfaceNormalPipeLineOgl.h"
 #include "FileIO/ObjLoader.h"
+#include "Rendering/OpenGL/Loaders/MeshLoaderOgl.h"
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -36,12 +37,12 @@ int main(int, char**)
         return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
-    EngiGraph::RenderContextOGL renderer(500,500, (GLADloadproc)glfwGetProcAddress);
+    EngiGraph::initOpenGl((GLADloadproc)glfwGetProcAddress);
     EngiGraph::Camera camera{EngiGraph::AngleDegrees<float>(90.0f),1.0f,0.001,1000,{0,-1,0}};
     camera.setPosition({5.0,5.0,5.0});
     camera.setLookTarget({0.0f,0.0f,0.0f});
-    renderer.addPipeLine(new EngiGraph::SurfaceNormalPipeLineOgl(camera));
-    auto mesh = renderer.resource_pool.loadMesh(EngiGraph::loadOBJ("meshes/utah_teapot.obj")[0]);
+    EngiGraph::SurfaceNormalPipeLineOgl pipeline = EngiGraph::SurfaceNormalPipeLineOgl(camera,500,500);
+    auto mesh = EngiGraph::loadMeshOgl(EngiGraph::loadOBJ("meshes/utah_teapot.obj")[0]);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -62,6 +63,7 @@ int main(int, char**)
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     Eigen::Vector3f cam_pos = {5.0f,5.0f,5.0f};
+    Eigen::Vector3f cam_look = {0,0,0};
 
     int width = 500;
     int height = 500;
@@ -79,19 +81,27 @@ int main(int, char**)
         if(width != last_width || height != last_height){
             last_width = width;
             last_height = height;
-            renderer.resize(width,height);
+            pipeline.resize(width,height);
         }
-        renderer.accessPipeLine<EngiGraph::SurfaceNormalPipeLineOgl>(0)->main_camera.setPosition(cam_pos);
-        renderer.accessPipeLine<EngiGraph::SurfaceNormalPipeLineOgl>(0)->submitDrawCall(EngiGraph::SurfaceNormalPipeLineOgl::DrawCall{mesh   ,{Eigen::Matrix4f::Identity()}});
+        pipeline.main_camera.setPosition(cam_pos);
+        pipeline.main_camera.setLookTarget(cam_look);
+        pipeline.submitDrawCall(mesh,Eigen::Matrix4f::Identity());
 
-        auto frame_buffer = renderer.render(0);
+        pipeline.render();
 
-        // Start the Dear ImGui frame
+        auto frame_buffer = pipeline.getMainFramebuffer();
+
+                // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::DragFloat3("Position of camera",cam_pos.data());
+        if ( ImGui::CollapsingHeader("Camera") ) {
+            ImGui::DragFloat3("Position",cam_pos.data());
+            ImGui::DragFloat3("Target",cam_look.data());
+        }
+
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
         ImGui::Begin("GameWindow");
         {

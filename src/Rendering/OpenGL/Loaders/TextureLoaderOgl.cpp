@@ -6,7 +6,7 @@
 
 namespace EngiGraph {
 
-    std::shared_ptr<TextureResourceOgl> loadTexture(const Image<uint32_t> &cpu_image) {
+    std::shared_ptr<TextureResourceOgl> loadTextureOgl(const Image<uint32_t> &cpu_image) {
         auto gpu_texture = std::make_shared<TextureResourceOgl>();
 
         glGenTextures(1, &gpu_texture->texture_id);
@@ -23,6 +23,8 @@ namespace EngiGraph {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (int)gpu_texture->width, (int)gpu_texture->height, 0, GL_RGB, GL_UNSIGNED_BYTE, cpu_image.getData().data());
 
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        return gpu_texture;
     }
 
 } // EngiGraph

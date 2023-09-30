@@ -15,6 +15,6 @@ namespace EngiGraph {
      * @throws RuntimeException Issue loading mesh.
      * @return A pointer to a gpu resource that will be deallocated when the pointer is destroyed.
      */
-    std::shared_ptr<MeshResourceOgl> loadMesh(const VisualMesh& cpu_mesh);
+    std::shared_ptr<MeshResourceOgl> loadMeshOgl(const VisualMesh& cpu_mesh);
 
 } // EngiGraph

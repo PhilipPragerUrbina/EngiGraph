@@ -16,6 +16,6 @@ namespace EngiGraph {
      * @param cpu_image Texture data on cpu.
      * @return A pointer to a gpu resource that will be deallocated when the pointer is destroyed.
      */
-        std::shared_ptr<TextureResourceOgl> loadTexture(const Image<uint32_t>& cpu_image);
+        std::shared_ptr<TextureResourceOgl> loadTextureOgl(const Image<uint32_t>& cpu_image);
 
 } // EngiGraph

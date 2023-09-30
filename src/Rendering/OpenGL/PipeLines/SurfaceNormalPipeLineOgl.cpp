@@ -5,7 +5,7 @@
 #include "SurfaceNormalPipeLineOgl.h"
 
 namespace EngiGraph {
-    void SurfaceNormalPipeLineOgl::render(const ResourcePoolOGL &resource_pool) {
+    void SurfaceNormalPipeLineOgl::render() {
         glBindFramebuffer(GL_FRAMEBUFFER, getMainFramebuffer().frame_buffer);
         glViewport(0,0,getMainFramebuffer().width,getMainFramebuffer().height);
         glEnable(GL_DEPTH_TEST);
@@ -18,19 +18,25 @@ namespace EngiGraph {
         shader.setUniform("view",main_camera.getViewMatrix());
         shader.setUniform("projection",main_camera.getProjectionMatrix());
 
-        std::vector<DrawCall> calls = popAllDrawCalls();
+        for (const auto& call : draw_calls) {
+            shader.setUniform("model", call.transform);
+            glBindVertexArray(call.mesh->vertex_array_id);
+            glDrawElements(GL_TRIANGLES, call.mesh->indices_size, GL_UNSIGNED_INT, nullptr);
 
-        for (const auto& call : calls) {
-            shader.setUniform("model", call.attributes.object_transform);
-            ResourcePoolOGL::OGLMesh mesh = resource_pool.getMesh(call.mesh);
-            glBindVertexArray(mesh.vertex_array_id);
-            glDrawElements(GL_TRIANGLES, mesh.indices_size, GL_UNSIGNED_INT, 0);
-            glBindVertexArray(0);
         }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);//todo move
+        glBindVertexArray(0);
+        draw_calls.clear();
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     void SurfaceNormalPipeLineOgl::resizeCallBack(int width, int height) {
         main_camera.setAspectRatio((float)width/(float)height);
+    }
+
+    SurfaceNormalPipeLineOgl::SurfaceNormalPipeLineOgl(const Camera &main_camera, int width, int height) : main_camera(main_camera) , PipelineOgl(width,height) {}
+
+    void SurfaceNormalPipeLineOgl::submitDrawCall(const std::shared_ptr<MeshResourceOgl> &mesh,
+                                                  const Eigen::Matrix4f &transform) {
+        draw_calls.push_back({mesh,transform});
     }
 } // EngiGraph

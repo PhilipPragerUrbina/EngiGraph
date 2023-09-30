@@ -7,7 +7,7 @@
 
 namespace EngiGraph {
 
-    std::shared_ptr<MeshResourceOgl> loadMesh(const VisualMesh &cpu_mesh) {
+    std::shared_ptr<MeshResourceOgl> loadMeshOgl(const VisualMesh &cpu_mesh) {
         auto gpu_mesh = std::make_shared<MeshResourceOgl>();
 
         //make sure mesh is render-able as a triangle mesh.
