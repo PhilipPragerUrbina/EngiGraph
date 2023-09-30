@@ -111,6 +111,9 @@ int main(int, char**)
             ImGui::DragFloat3("Position",cam_pos.data());
             ImGui::DragFloat3("Target",cam_look.data());
         }
+        if ( ImGui::CollapsingHeader("World") ) {
+            ImGui::ColorEdit3("Ambient",pipeline.ambient_color.data());
+        }
 
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
