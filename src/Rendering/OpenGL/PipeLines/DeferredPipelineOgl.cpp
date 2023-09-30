@@ -3,6 +3,8 @@
 //
 
 #include "DeferredPipelineOgl.h"
+#include "../../../FileIO/ObjLoader.h"
+#include "../Loaders/MeshLoaderOgl.h"
 
 namespace EngiGraph {
     void DeferredPipelineOgl::submitDrawCall(const DeferredPipelineOgl::DrawCall &draw_call) {
@@ -21,13 +23,14 @@ namespace EngiGraph {
     }
 
     void DeferredPipelineOgl::render() {
-        //Initialize viewport and depth testing.
         glViewport(0,0,getMainFramebuffer().width,getMainFramebuffer().height);
+
         glEnable(GL_DEPTH_TEST);
-        //Bind internal framebuffer
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
         glBindFramebuffer(GL_FRAMEBUFFER, g_buffer);
-        //Blank start is crucial.
-        glClearColor(0.0f,0.0f,0.0f, 1.0f);
+        glClearColor(0.0f,0.0f,0.0f, 1.0f); //Blank start is crucial.
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shader_g_pass.use();
@@ -47,32 +50,80 @@ namespace EngiGraph {
 
         //bind empty vao for full screen rendering
         glBindVertexArray(empty_vao);
+
         //bind main output frame buffer
         glBindFramebuffer(GL_FRAMEBUFFER, getMainFramebuffer().frame_buffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearColor(0.0f,0.0f,0.0f,1.0f); //This can be any color, it will be overridden
 
-        //Use the shading pass
-        shader_shading_pass.use();
-
-        shader_shading_pass.setUniform("ambient_color",ambient_color);
-
+        //Ambient lighting pass
+        shader_ambient_pass.use();
+        shader_ambient_pass.setUniform("ambient_color",ambient_color);
         //Bind the buffers rendered in first pass
         glActiveTexture(GL_TEXTURE0);
-        shader_shading_pass.setUniform("position_buffer",0);
+        shader_ambient_pass.setUniform("position_buffer",0);
         glBindTexture(GL_TEXTURE_2D, g_position);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, g_normal);
-        shader_shading_pass.setUniform("normal_buffer",1);
+        shader_ambient_pass.setUniform("normal_buffer",1);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, g_albedo);
-        shader_shading_pass.setUniform("albedo_buffer",2);
-
+        shader_ambient_pass.setUniform("albedo_buffer",2);
         //Attribute less rendering for full screen
         glDrawArrays(GL_TRIANGLES, 0,3);
+
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ONE, GL_ZERO);
+        glBlendEquation(GL_FUNC_ADD);
+        glCullFace(GL_FRONT); //Avoid shading light twice
+
+        //Point light pass
+        shader_light_pass.use();
+        shader_light_pass.setUniform("screen_size", Eigen::Vector2f(getMainFramebuffer().width,getMainFramebuffer().height));
+        shader_light_pass.setUniform("view",camera.getViewMatrix());
+        shader_light_pass.setUniform("projection",camera.getProjectionMatrix());
+        shader_light_pass.setUniform("camera_position",camera.getPosition());
+
+        glActiveTexture(GL_TEXTURE0);
+        shader_light_pass.setUniform("position_buffer",0);
+        glBindTexture(GL_TEXTURE_2D, g_position);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, g_normal);
+        shader_light_pass.setUniform("normal_buffer",1);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, g_albedo);
+        shader_light_pass.setUniform("albedo_buffer",2);
+
+        glBindVertexArray(unit_sphere->vertex_array_id);
+        //todo uniform buffer draw all lights at once with draw arrays
+        for (const PointLight& light : point_lights) {
+            //calculate the max radius of the light
+            float light_max = std::fmaxf(std::fmaxf(light.color.x(), light.color.y()), light.color.z())*light.brightness;
+            float radius =(-light.linear_attenuation +  std::sqrtf(light.linear_attenuation * light.linear_attenuation - 4.0f * light.quadratic_attenuation * (light.constant_attenuation - (256.0f / 5.0f) * light_max)))/ (2.0f * light.quadratic_attenuation);
+
+            shader_light_pass.setUniform("light_constant", light.constant_attenuation );
+            shader_light_pass.setUniform("light_linear", light.linear_attenuation);
+            shader_light_pass.setUniform("light_quadratic", light.quadratic_attenuation);
+
+            shader_light_pass.setUniform("light_scale_factor", radius );
+            shader_light_pass.setUniform("light_position", light.position);
+            shader_light_pass.setUniform("light_color", (Eigen::Vector3f)(light.color * light.brightness));
+            glDrawElements(GL_TRIANGLES, unit_sphere->indices_size, GL_UNSIGNED_INT, nullptr);
+        }
+
+        //Copy depth data so the framebuffer has proper depth data for compositing
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, g_buffer);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, getMainFramebuffer().frame_buffer);
+        glBlitFramebuffer(
+                0, 0, getMainFramebuffer().width, getMainFramebuffer().height, 0, 0, getMainFramebuffer().width, getMainFramebuffer().height, GL_DEPTH_BUFFER_BIT, GL_NEAREST
+        );
+
         //clean up
+        glDisable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
+        glCullFace(GL_BACK);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glBindVertexArray(0);
         draw_calls.clear();
     }
 
@@ -127,5 +178,10 @@ namespace EngiGraph {
         assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE); //Check for completion
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0); //unbind
+    }
+
+    DeferredPipelineOgl::DeferredPipelineOgl(int width, int height, const Camera &camera) : camera(camera) , PipelineOgl(width,height) {
+        glGenVertexArrays(1, &empty_vao);
+        unit_sphere = loadMeshOgl(loadOBJ("./meshes/unit_sphere.obj")[0]);
     }
 } // EngiGraph

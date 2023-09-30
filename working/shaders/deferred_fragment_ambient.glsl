@@ -11,5 +11,5 @@ uniform sampler2D albedo_buffer;
 
 void main()
 {
-    FragColor = texture(albedo_buffer,screen_uv)+vec4(ambient_color,0.0f);
+    FragColor = texture(albedo_buffer,screen_uv)*vec4(ambient_color,1.0f);
 }

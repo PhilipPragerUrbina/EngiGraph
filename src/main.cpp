@@ -10,7 +10,6 @@
 #include "FileIO/ImageIo.h"
 #include "Rendering/OpenGL/Loaders/TextureLoaderOgl.h"
 #include "Rendering/OpenGL/PipeLines/DeferredPipelineOgl.h"
-
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -76,6 +75,9 @@ int main(int, char**)
         Eigen::Vector3f cam_pos = {5.0f, 5.0f, 5.0f};
         Eigen::Vector3f cam_look = {0, 0, 0};
 
+        EngiGraph::DeferredPipelineOgl::PointLight basic_light{{0,0,0},{1,1,1}};
+        pipeline.point_lights.push_back(basic_light);
+
         int width = 500;
         int height = 500;
         int last_width = 500;
@@ -107,6 +109,29 @@ int main(int, char**)
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
+
+            if (ImGui::CollapsingHeader("Lights")) {
+                ImGui::Indent();
+                int i = 0;
+                for ( auto& light : pipeline.point_lights) {
+                    ImGui::PushID(i);
+                    i++;
+                    if (ImGui::CollapsingHeader("Point light")) {
+                        ImGui::DragFloat3("Point", light.position.data());
+                        ImGui::DragFloat("Brightness", &light.brightness);
+                        ImGui::DragFloat("Constant attenuation", &light.constant_attenuation);
+                        ImGui::DragFloat("Linear attenuation", &light.linear_attenuation);
+                        ImGui::DragFloat("Quadratic attenuation", &light.quadratic_attenuation);
+                        ImGui::ColorEdit3("Luminance", light.color.data());
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::Unindent();
+                if(ImGui::Button("Add Light")){
+                    pipeline.point_lights.push_back(basic_light);
+                }
+            }
+
 
             if (ImGui::CollapsingHeader("Camera")) {
                 ImGui::DragFloat3("Position", cam_pos.data());
@@ -177,8 +202,6 @@ int main(int, char**)
         }
     }
 
-
-    //todo catch errors and display them as popups. Also make sure to clean up after errors.
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
