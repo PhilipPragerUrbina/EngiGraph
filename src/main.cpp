@@ -7,6 +7,9 @@
 #include "Rendering/OpenGL/PipeLines/SurfaceNormalPipeLineOgl.h"
 #include "FileIO/ObjLoader.h"
 #include "Rendering/OpenGL/Loaders/MeshLoaderOgl.h"
+#include "FileIO/ImageIo.h"
+#include "Rendering/OpenGL/Loaders/TextureLoaderOgl.h"
+#include "Rendering/OpenGL/PipeLines/DeferredPipelineOgl.h"
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -41,8 +44,14 @@ int main(int, char**)
     EngiGraph::Camera camera{EngiGraph::AngleDegrees<float>(90.0f),1.0f,0.001,1000,{0,-1,0}};
     camera.setPosition({5.0,5.0,5.0});
     camera.setLookTarget({0.0f,0.0f,0.0f});
-    EngiGraph::SurfaceNormalPipeLineOgl pipeline = EngiGraph::SurfaceNormalPipeLineOgl(camera,500,500);
-    auto mesh = EngiGraph::loadMeshOgl(EngiGraph::loadOBJ("meshes/utah_teapot.obj")[0]);
+    auto pipeline = EngiGraph::DeferredPipelineOgl(500,500,camera);
+
+    auto meshes = EngiGraph::loadOBJ("meshes/mori_knob.obj");
+    auto mesh = EngiGraph::loadMeshOgl(meshes[0]);
+    auto mesh2 = EngiGraph::loadMeshOgl(meshes[1]);
+    auto mesh3 = EngiGraph::loadMeshOgl(meshes[4]);
+    auto albedo = EngiGraph::loadTextureOgl(EngiGraph::readImage("textures/test_orange.png"));
+    auto albedo2 = EngiGraph::loadTextureOgl(EngiGraph::readImage("textures/test_blue.png"));
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -83,9 +92,11 @@ int main(int, char**)
             last_height = height;
             pipeline.resize(width,height);
         }
-        pipeline.main_camera.setPosition(cam_pos);
-        pipeline.main_camera.setLookTarget(cam_look);
-        pipeline.submitDrawCall(mesh,Eigen::Matrix4f::Identity());
+        pipeline.camera.setPosition(cam_pos);
+        pipeline.camera.setLookTarget(cam_look);
+        pipeline.submitDrawCall({mesh,albedo,Eigen::Matrix4f::Identity()});
+        pipeline.submitDrawCall({mesh2,albedo,Eigen::Matrix4f::Identity()});
+        pipeline.submitDrawCall({mesh3,albedo2,Eigen::Matrix4f::Identity()});
 
         pipeline.render();
 

@@ -16,6 +16,7 @@ TEST(LOADER_TESTS, TEST_IMAGE_LOADER) {
     ASSERT_EQ(jpg.getWidth(),256);
     ASSERT_EQ(jpg.getHeight(),256);
     uint32_t color = jpg.getPixel(0,0);
+    ASSERT_NE(color,255); //Assert not black
     ASSERT_EQ(((uint8_t*)&color)[3], 255); //Test generated alpha
 
 }

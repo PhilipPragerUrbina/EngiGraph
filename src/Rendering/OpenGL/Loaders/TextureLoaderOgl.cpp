@@ -17,12 +17,13 @@ namespace EngiGraph {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        gpu_texture->width = cpu_image.getWidth();
-        gpu_texture->height = cpu_image.getHeight();
-
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, (int)gpu_texture->width, (int)gpu_texture->height, 0, GL_RGB, GL_UNSIGNED_BYTE, cpu_image.getData().data());
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, cpu_image.getWidth(), cpu_image.getHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, cpu_image.getData().data());
+        glGenerateMipmap(GL_TEXTURE_2D);
 
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        gpu_texture->width = cpu_image.getWidth();
+        gpu_texture->height = cpu_image.getHeight();
 
         return gpu_texture;
     }
