@@ -5,6 +5,10 @@
 #include "DeferredPipelineOgl.h"
 #include "../../../FileIO/ObjLoader.h"
 #include "../Loaders/MeshLoaderOgl.h"
+#include "../../../FileIO/ImageIo.h"
+#include "../Loaders/TextureLoaderOgl.h"
+
+//todo instanced lighting rendering
 
 namespace EngiGraph {
     void DeferredPipelineOgl::submitDrawCall(const DeferredPipelineOgl::DrawCall &draw_call) {
@@ -58,6 +62,8 @@ namespace EngiGraph {
 
         //Ambient lighting pass
         shader_ambient_pass.use();
+        shader_ambient_pass.setUniform("view",camera.getViewMatrix());
+        shader_ambient_pass.setUniform("projection",camera.getProjectionMatrix());
         shader_ambient_pass.setUniform("ambient_color",ambient_color);
         //Bind the buffers rendered in first pass
         glActiveTexture(GL_TEXTURE0);
@@ -69,6 +75,11 @@ namespace EngiGraph {
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, g_albedo);
         shader_ambient_pass.setUniform("albedo_buffer",2);
+
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, blue_noise->texture_id);
+        shader_ambient_pass.setUniform("blue_noise",3);
+
         //Attribute less rendering for full screen
         glDrawArrays(GL_TRIANGLES, 0,3);
 
@@ -122,6 +133,7 @@ namespace EngiGraph {
         //clean up
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         draw_calls.clear();
@@ -149,8 +161,10 @@ namespace EngiGraph {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_position, 0);
-        //position texture(float3)
+        //normal texture(float3)
         glGenTextures(1, &g_normal);
         glBindTexture(GL_TEXTURE_2D, g_normal);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
@@ -183,5 +197,8 @@ namespace EngiGraph {
     DeferredPipelineOgl::DeferredPipelineOgl(int width, int height, const Camera &camera) : camera(camera) , PipelineOgl(width,height) {
         glGenVertexArrays(1, &empty_vao);
         unit_sphere = loadMeshOgl(loadOBJ("./meshes/unit_sphere.obj")[0]);
+        blue_noise = loadTextureOgl(readImage("./textures/blue_noise.png"));
+
+
     }
 } // EngiGraph

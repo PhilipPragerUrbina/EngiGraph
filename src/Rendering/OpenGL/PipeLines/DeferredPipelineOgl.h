@@ -97,6 +97,7 @@ namespace EngiGraph {
         /**
          * Create a deferred shading pipeline.
          * @warning Requires ./meshes/unit_sphere.obj mesh data to be available, or will throw an exception.
+         * @warning Requires ./textures/blue_noise.png mesh data to be available, or will throw an exception.
          * @param camera Camera to start with.
          */
         DeferredPipelineOgl(int width, int height, const Camera& camera);
@@ -113,6 +114,8 @@ namespace EngiGraph {
         void resizeCallBack(int width, int height) override;
 
     private:
+
+        std::shared_ptr<TextureResourceOgl> blue_noise;
 
         std::shared_ptr<MeshResourceOgl> unit_sphere; //sphere with radius of 1
 

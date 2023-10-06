@@ -10,6 +10,8 @@
 #include "FileIO/ImageIo.h"
 #include "Rendering/OpenGL/Loaders/TextureLoaderOgl.h"
 #include "Rendering/OpenGL/PipeLines/DeferredPipelineOgl.h"
+#include "Geometry/MeshConversions.h"
+
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -68,7 +70,6 @@ int main(int, char**)
         auto mesh3 = EngiGraph::loadMeshOgl(meshes[4]);
         auto albedo = EngiGraph::loadTextureOgl(EngiGraph::readImage("textures/test_orange.png"));
         auto albedo2 = EngiGraph::loadTextureOgl(EngiGraph::readImage("textures/test_blue.png"));
-
 
         // Our state
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
