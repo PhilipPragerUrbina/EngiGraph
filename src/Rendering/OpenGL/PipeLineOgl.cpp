@@ -3,7 +3,7 @@
 //
 #include <cassert>
 #include "PipelineOgl.h"
-#include "../../Exceptions/RuntimeException.h"
+#include "./src/Exceptions/RuntimeException.h"
 namespace EngiGraph {
 
     bool GLAD_INITIALIZED = false;

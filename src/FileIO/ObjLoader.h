@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "../Geometry/VisualMesh.h"
+#include "./src/Geometry/VisualMesh.h"
 #include <vector>
 
 namespace EngiGraph {

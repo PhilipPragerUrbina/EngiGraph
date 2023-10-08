@@ -3,7 +3,7 @@
 //
 
 #include "MeshLoaderOgl.h"
-#include "../../../Exceptions/RuntimeException.h"
+#include "./src/Exceptions/RuntimeException.h"
 
 namespace EngiGraph {
 

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "../Image/Image.h"
+#include "./src/Image/Image.h"
 #include <cstdint>
 #include <string>
 
@@ -17,7 +17,7 @@ namespace EngiGraph {
      * @return 8 bit RGBA image.
      * @throws RuntimeException if unable to open the file.
      */
-    Image<uint32_t> readImage(const std::string& file);
+    Image<uint32_t> loadImage(const std::string& file);
 
     // todo image write
 

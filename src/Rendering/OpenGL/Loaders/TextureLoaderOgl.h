@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "../Resources/TextureResourceOgl.h"
-#include "../../../Image/Image.h"
+#include "./src/Rendering/OpenGL/Resources/TextureResourceOgl.h"
+#include "./src/Image/Image.h"
 #include <memory>
 
 namespace EngiGraph {

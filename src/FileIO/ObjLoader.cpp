@@ -6,7 +6,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "TinyOBJLoader/tiny_obj_loader.h"
 #include "FileUtils.h"
-#include "../Exceptions/RuntimeException.h"
+#include "./src/Exceptions/RuntimeException.h"
 namespace EngiGraph {
 
     std::vector<VisualMesh> loadOBJ(const std::string& filename){

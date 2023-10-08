@@ -68,8 +68,8 @@ int main(int, char**)
         auto mesh = EngiGraph::loadMeshOgl(meshes[0]);
         auto mesh2 = EngiGraph::loadMeshOgl(meshes[1]);
         auto mesh3 = EngiGraph::loadMeshOgl(meshes[4]);
-        auto albedo = EngiGraph::loadTextureOgl(EngiGraph::readImage("textures/test_orange.png"));
-        auto albedo2 = EngiGraph::loadTextureOgl(EngiGraph::readImage("textures/test_blue.png"));
+        auto albedo = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_orange.png"));
+        auto albedo2 = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_blue.png"));
 
         // Our state
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

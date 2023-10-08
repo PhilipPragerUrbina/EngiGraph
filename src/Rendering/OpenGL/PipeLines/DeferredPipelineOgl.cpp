@@ -3,10 +3,10 @@
 //
 
 #include "DeferredPipelineOgl.h"
-#include "../../../FileIO/ObjLoader.h"
-#include "../Loaders/MeshLoaderOgl.h"
-#include "../../../FileIO/ImageIo.h"
-#include "../Loaders/TextureLoaderOgl.h"
+#include "./src/FileIO/ObjLoader.h"
+#include "./src/Rendering/OpenGL/Loaders/MeshLoaderOgl.h"
+#include "./src/FileIO/ImageIo.h"
+#include "./src/Rendering/OpenGL/Loaders/TextureLoaderOgl.h"
 
 //todo instanced lighting rendering
 
@@ -197,7 +197,7 @@ namespace EngiGraph {
     DeferredPipelineOgl::DeferredPipelineOgl(int width, int height, const Camera &camera) : camera(camera) , PipelineOgl(width,height) {
         glGenVertexArrays(1, &empty_vao);
         unit_sphere = loadMeshOgl(loadOBJ("./meshes/unit_sphere.obj")[0]);
-        blue_noise = loadTextureOgl(readImage("./textures/blue_noise.png"));
+        blue_noise = loadTextureOgl(loadImage("./textures/blue_noise.png"));
 
 
     }

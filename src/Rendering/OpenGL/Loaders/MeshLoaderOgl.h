@@ -4,8 +4,8 @@
 
 #pragma once
 #include <memory>
-#include "../Resources/MeshResourceOgl.h"
-#include "../../../Geometry/VisualMesh.h"
+#include "./src/Rendering/OpenGL/Resources/MeshResourceOgl.h"
+#include "./src/Geometry/VisualMesh.h"
 
 namespace EngiGraph {
 

@@ -8,7 +8,7 @@ find_package(ArrayFire REQUIRED)
 find_package(OpenCL REQUIRED)
 find_package(OpenGL REQUIRED)
 
-include_directories(external/Eigen/Eigen external/TaskFlow ${ArrayFire_INCLUDE_DIRS} external/CL external/STB external/GLFW/include external/IMGUI external/IMGUI/backends external/glad/include external)
+include_directories(${PROJECT_SOURCE_DIR} external/Eigen/Eigen external/TaskFlow ${ArrayFire_INCLUDE_DIRS} external/CL external/STB external/GLFW/include external/IMGUI external/IMGUI/backends external/glad/include external)
 
 #imgui files
 file(GLOB imgui_sources CONFIGURE_DEPENDS external/IMGUI/*.h external/IMGUI/*.cpp external/IMGUI/backends/imgui_impl_glfw.h external/IMGUI/backends/imgui_impl_glfw.cpp external/IMGUI/backends/imgui_impl_opengl3.cpp external/IMGUI/backends/imgui_impl_opengl3.h)

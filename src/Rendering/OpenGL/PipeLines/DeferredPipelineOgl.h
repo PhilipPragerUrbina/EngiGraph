@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include "../PipelineOgl.h"
-#include "../Resources/TextureResourceOgl.h"
+#include "./src/Rendering/OpenGL/PipelineOgl.h"
+#include "./src/Rendering/OpenGL/Resources/TextureResourceOgl.h"
 #include <memory>
 #include <vector>
-#include "../../Camera.h"
-#include "../ShaderOgl.h"
+#include "./src/Rendering/Camera.h"
+#include "./src/Rendering/OpenGL/ShaderOgl.h"
 
 namespace EngiGraph {
 

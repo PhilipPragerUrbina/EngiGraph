@@ -8,7 +8,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-#include "../../Exceptions/RuntimeException.h"
+#include "./src/Exceptions/RuntimeException.h"
 #include <Eigen>
 
 namespace EngiGraph {

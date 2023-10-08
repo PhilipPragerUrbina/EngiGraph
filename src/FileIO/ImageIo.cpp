@@ -3,16 +3,16 @@
 //
 
 #include "ImageIo.h"
-#include "../Exceptions/RuntimeException.h"
+#include "./src/Exceptions/RuntimeException.h"
 #include "FileUtils.h"
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "STB/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "STB/stb_image_write.h"
 
 namespace EngiGraph {
 
-    Image<uint32_t> readImage(const std::string &file) {
+    Image<uint32_t> loadImage(const std::string &file) {
         validateFileExistence(file);
         validateFileExtensions(file,{".jpg",".jpeg",".png", ".tga",".bmp"});
         int width, height, channel_count;

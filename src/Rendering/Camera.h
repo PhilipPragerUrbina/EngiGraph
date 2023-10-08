@@ -4,7 +4,8 @@
 
 #pragma once
 #include "EigenGraphicsUtils.h"
-#include "../Units/AngleConversions.h"
+#include "./src/Math/AngleConversions.h"
+
 namespace EngiGraph {
 
     /**

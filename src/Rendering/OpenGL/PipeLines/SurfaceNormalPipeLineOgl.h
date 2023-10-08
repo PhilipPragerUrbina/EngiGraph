@@ -3,9 +3,9 @@
 //
 
 #pragma once
-#include "../ShaderOgl.h"
-#include "../PipelineOgl.h"
-#include "../../Camera.h"
+#include "./src/Rendering/OpenGL/ShaderOgl.h"
+#include "./src/Rendering/OpenGL/PipelineOgl.h"
+#include "./src/Rendering/Camera.h"
 
 namespace EngiGraph {
 
