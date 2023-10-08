@@ -54,7 +54,6 @@ namespace EngiGraph {
                     vertex.position = {vx,vy,vz};
 
                     mesh.indices.push_back(index_offset + v); //This loader has per attribute indices, so there is no proper indexing scheme.
-                    //todo separate mesh indexing function
 
                     if (idx.normal_index >= 0 && !face_generate_normals) {
                         tinyobj::real_t nx = attrib.normals[3*size_t(idx.normal_index)+0];
@@ -92,7 +91,6 @@ namespace EngiGraph {
                 index_offset += 3;
             }
             meshes.push_back(mesh);
-           //todo run validation and cleanup here
         }
         return meshes;
     }

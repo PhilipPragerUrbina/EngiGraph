@@ -51,7 +51,6 @@ namespace EngiGraph {
          */
         std::vector<uint32_t> indices{};
 
-        //todo index combining function
         //todo check if any vertices are referenced by indices that are out of bounds
         //todo check if any vertices can be removed since they are not referenced by indices.
 

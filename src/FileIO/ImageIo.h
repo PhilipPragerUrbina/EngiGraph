@@ -19,6 +19,5 @@ namespace EngiGraph {
      */
     Image<uint32_t> loadImage(const std::string& file);
 
-    // todo image write
 
 } // EngiGraph

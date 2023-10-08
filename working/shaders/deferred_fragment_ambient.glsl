@@ -16,7 +16,6 @@ uniform mat4 projection;
 
 void main()
 {
-    //todo ssao
 
     FragColor = texture(albedo_buffer,screen_uv)*vec4(ambient_color,1.0f);
 }
