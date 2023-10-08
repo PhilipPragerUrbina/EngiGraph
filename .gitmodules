@@ -13,6 +13,3 @@
 [submodule "external/IMGUI"]
 	path = external/IMGUI
 	url = https://github.com/ocornut/imgui
-[submodule "external/TICCD"]
-	path = external/TICCD
-	url = https://github.com/Continuous-Collision-Detection/Tight-Inclusion
