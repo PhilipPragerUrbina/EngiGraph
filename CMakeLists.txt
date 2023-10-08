@@ -13,8 +13,8 @@ include_directories(${PROJECT_SOURCE_DIR} external/Eigen/Eigen external/TaskFlow
 #imgui files
 file(GLOB imgui_sources CONFIGURE_DEPENDS external/IMGUI/*.h external/IMGUI/*.cpp external/IMGUI/backends/imgui_impl_glfw.h external/IMGUI/backends/imgui_impl_glfw.cpp external/IMGUI/backends/imgui_impl_opengl3.cpp external/IMGUI/backends/imgui_impl_opengl3.h)
 
-#find source files
-file(GLOB_RECURSE sources CONFIGURE_DEPENDS src/*.h src/*.cpp external/glad/src/glad.c)
+#find internal and external source files
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS src/*.h src/*.cpp external/glad/src/glad.c external/TICCD/src/*.hpp external/TICCD/src/*.cpp)
 add_executable(EngiGraph ${sources} ${imgui_sources})
 add_library(EngiGraphLib ${sources} ${imgui_sources})
 
