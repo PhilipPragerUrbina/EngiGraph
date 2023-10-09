@@ -84,18 +84,20 @@ namespace EngiGraph {
         double bz = s.z()*b_local[k.z()];
         double cz = s.z()*c_local[k.z()];
         double t = u*az + v*bz + w*cz;
+        //todo see if this can become dot product
 
-        //depth test
-        if(t * (determinant < 0.0 ? -1.0 : 1.0) < 0.0) return false;
+        //depth test. The std::copysign() is used to get either 1.0 or -1.0.
+        if(t * std::copysign(1.0,determinant) < 0.0) return false;
 
         //normalize
-        double inverse_det = 1.0/determinant;
-        hit_info[0] = u*inverse_det;
-        hit_info[1] = v*inverse_det;
-        hit_info[2] = w*inverse_det;
-        hit_info[3] = t*inverse_det;
+        hit_info = {u,v,w,t};
+        hit_info *= 1.0/determinant;
         return true;
     }
+
+    //todo impl https://research.nvidia.com/sites/default/files/pubs/2019-03_Cool-Patches%3A-A/Chapter_08.pdf
+    //todo impl refining approximation that is better for GPU use: https://www.reedbeta.com/blog/quadrilateral-interpolation-part-2/
+    
 
     //Do linear ccd treating one mesh as a stationary triangle mesh and the other as moving points.
     std::optional<Eigen::Vector4d> linearCCDOneWay(const Mesh &tri_mesh, const Mesh &point_mesh, const Eigen::Matrix4d &point_mesh_initial,  const Eigen::Matrix4d &point_mesh_final,const double & time){
