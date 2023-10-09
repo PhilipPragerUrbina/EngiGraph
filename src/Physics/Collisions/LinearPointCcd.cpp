@@ -8,40 +8,93 @@
 
 namespace EngiGraph {
 
-    //todo test and optimize
-    //todo clean up
-    //todo replace with Watertight ray triangle intersection
-    bool rayTriangleIntersection(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const Eigen::Vector3d& c, const Eigen::Vector3d& origin, const Eigen::Vector3d& direction, double& distance ){
-        Eigen::Vector3d v0v1 = b - a;
-        Eigen::Vector3d v0v2 = c - a;
-        Eigen::Vector3d pvec = direction.cross(v0v2);
-        double det = v0v1.dot(pvec);
 
-        //floating point error range. Larger for larger objects to avoid speckling problem.
-        const double EPSILON = 0.00000f; //todo check
-        if (std::abs(det) < EPSILON) return false;
 
-        Eigen::Vector3d barycentric_coordinates;
+    /**
+     * Calculate the dimensions where the ray direction is maximal.
+     * @see rayTriangleIntersection()
+     * @details This should be called once per ray, and then passed into the ray triangle intersection code.
+     * @param direction Ray direction unit vector.
+     * @return Vector containing kx,ky,kz. Each number represents one of 3 axis(0,1,2).
+     */
+    Eigen::Matrix<uint8_t,3,1> calculateRayDimensions(const Eigen::Vector3d& direction){
+        uint8_t kz = 0;
+        direction.cwiseAbs().maxCoeff(&kz);
+        uint8_t kx = (kz + 1) % 3;
+        uint8_t ky = (kx + 1) % 3;
+        return {kx,ky,kz};
+    }
 
-        double invdet = 1.0 / det;
-        Eigen::Vector3d tvec = origin - a;
-        barycentric_coordinates[0] = tvec.dot(pvec) * invdet;
-        if (barycentric_coordinates[0] < 0.0f || barycentric_coordinates[0] > 1.0f) return false;
+    /**
+     * Calculate ray shear constraints.
+     * @see rayTriangleIntersection()
+     * @details This should be called once per ray, and then passed into the ray triangle intersection code.
+     * @param k From calculateRayDimensions() with same direction.
+     * @warning Direction must be unit vector or nans will propagate.
+     * @param direction Ray direction unit vector.
+     * @return Vector containing sx,sy,sz.
+     */
+    Eigen::Vector3d calculateRayShearConstraints(const Eigen::Matrix<uint8_t,3,1>& k, const Eigen::Vector3d& direction){
+        return {direction[k.x()]/direction[k.z()], direction[k.y()]/direction[k.z()], 1.0/direction[k.z()]};
+    }
 
-        Eigen::Vector3d qvec = tvec.cross(v0v1);
-        barycentric_coordinates[1] = direction.dot(qvec) * invdet;
-        if (barycentric_coordinates[1] < 0.0f || barycentric_coordinates[0] + barycentric_coordinates[1] > 1.0f) return false;
 
-        barycentric_coordinates[2] = 1.0f - barycentric_coordinates[0] - barycentric_coordinates[1];
+    /**
+     * Watertight ray triangle intersection.
+     * @details This does not perform backface culling.
+     * @see https://jcgt.org/published/0002/01/05/paper.pdf
+     * @param a, b, c Triangle vertices.
+     * @param origin Ray origin.
+     * @param hit_info Output vector containing information about hit if hit occured. xyz components contain UVW barycentric coordinates. w component contains hit distance.
+     * @param k Maximum dimensions, get this from calculateRayDimensions().
+     * @param s Shear constraints, get this from calculateRayShearConstraints().
+     * @details These last two parameters are calculated once per ray(not per triangle).
+     * @return True if intersection occurs.
+     */
+    bool rayTriangleIntersection(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const Eigen::Vector3d& c, const Eigen::Vector3d& origin, Eigen::Vector4d& hit_info,
+                                 const Eigen::Matrix<uint8_t,3,1>& k, const Eigen::Vector3d& s){
+        //Vertices relative to origin
+        Eigen::Vector3d a_local = a - origin;
+        Eigen::Vector3d b_local = b - origin;
+        Eigen::Vector3d c_local = c - origin;
 
-        double dist = v0v2.dot(qvec) * invdet;
-        const double DELTA = 0.0001; //check if in small range. this is to stop ray from intersecting with triangle again after bounce.
-        //todo check
-        if (dist > DELTA){
-            distance = dist;
-            return true;
-        }
-        return false;
+        //Shear and scale vertices
+        double ax = a_local[k.x()] - s.x()*a_local[k.z()];
+        double ay = a_local[k.y()] - s.y()*a_local[k.z()];
+        double bx = b_local[k.x()] - s.x()*b_local[k.z()];
+        double by = b_local[k.y()] - s.y()*b_local[k.z()];
+        double cx = c_local[k.x()] - s.x()*c_local[k.z()];
+        double cy = c_local[k.y()] - s.y()*c_local[k.z()];
+        //todo see if this can be converted to SIMD vector math optimization
+
+        //scaled barycentric coordinates
+        double u = cx*by-cy*bx;
+        double v = ax*cy-ay*cx;
+        double w = bx*ay-by*ax;
+
+        //Edge tests
+        if ((u<0.0 || v<0.0 || w<0.0) && (u>0.0 || v>0.0 || w>0.0)) return false;
+
+        double determinant = u + v + w;
+
+        if(determinant == 0.0) return false;
+
+        //calculate hit distance
+        double az = s.z()*a_local[k.z()];
+        double bz = s.z()*b_local[k.z()];
+        double cz = s.z()*c_local[k.z()];
+        double t = u*az + v*bz + w*cz;
+
+        //depth test
+        if(t * (determinant < 0.0 ? -1.0 : 1.0) < 0.0) return false;
+
+        //normalize
+        double inverse_det = 1.0/determinant;
+        hit_info[0] = u*inverse_det;
+        hit_info[1] = v*inverse_det;
+        hit_info[2] = w*inverse_det;
+        hit_info[3] = t*inverse_det;
+        return true;
     }
 
     //Do linear ccd treating one mesh as a stationary triangle mesh and the other as moving points.
@@ -66,14 +119,14 @@ std::cout << point_initial << " & "<< point_final << " |\n";
                //We do not care about what happened in the past, only the future, so a ray makes sense
                double distance = 0.0f;
                //todo check precision
-               if(rayTriangleIntersection(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+2]].cast<double>(),
-                                          point_initial,direction,distance)){
-                   double time_of_impact = distance / speed;
-                   if(time_of_impact < earliest){
-                       earliest = time_of_impact;
-                       earliest_point = point_initial + direction * distance;
-                   }
-               }
+             //  if(rayTriangleIntersection(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+2]].cast<double>(),
+            //                              point_initial,direction,distance)){
+            //       double time_of_impact = distance / speed;
+            //       if(time_of_impact < earliest){
+             //          earliest = time_of_impact;
+                  //     earliest_point = point_initial + direction * distance;
+                //   }
+           //    }
             }
         }
         if(earliest_point){

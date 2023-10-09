@@ -2,8 +2,8 @@
 // Created by Philip on 9/20/2023.
 //
 #include "gtest/gtest.h"
-#include "../src/Units/AngleConversions.h"
-#include "../src/Units/Constants.h"
+#include "../src/Math/AngleConversions.h"
+#include "../src/Math/Constants.h"
 TEST(CONVERSION_TESTS, TEST_ANGLE_CONVERSIONS) {
     //Zero float
     ASSERT_FLOAT_EQ(EngiGraph::convert(EngiGraph::AngleRadians(0.0f)).value,0.0f);

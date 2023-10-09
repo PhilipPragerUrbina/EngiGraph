@@ -3,7 +3,7 @@
 //
 #include <gtest/gtest.h>
 #include "../src/Rendering/EigenGraphicsUtils.h"
-#include "../src/Units/AngleConversions.h"
+#include "../src/Math/AngleConversions.h"
 
 //We test against GLM as a reference implementation here since these utilities are supposed to mimic GLM.
 
