@@ -8,6 +8,8 @@
 #include "Rendering/OpenGL/Loaders/TextureLoaderOgl.h"
 
 #include "Rendering/OpenGL/PipeLines/DeferredPipelineOgl.h"
+#include "src/Geometry/MeshConversions.h"
+#include "src/Physics/Collisions/LinearPointCcd.h"
 
 #include <GLFW/glfw3.h>
 
@@ -66,9 +68,19 @@ int main(int, char**)
         auto albedo = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_orange.png"));
         auto albedo2 = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_blue.png"));
 
+        auto mesh_teapot = EngiGraph::loadOBJ("meshes/unit_sphere.obj")[0];
+        auto mesh_teapot_visual = EngiGraph::loadMeshOgl(mesh_teapot);
+        auto mesh_physics = EngiGraph::stripVisualMesh(mesh_teapot);
+
+
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
         Eigen::Vector3f cam_pos = {5.0f, 5.0f, 5.0f};
         Eigen::Vector3f cam_look = {0, 0, 0};
+
+        Eigen::Vector3f teapot_a_position_initial = {2.0,2.0,2.0};
+        Eigen::Vector3f teapot_a_position_final = {1.0,1.0,1.0};
+        Eigen::Vector3f teapot_b_position = {1.5,1.5,1.5};
+
 
         EngiGraph::DeferredPipelineOgl::PointLight basic_light{{0,0,0},{1,1,1}};
         pipeline.point_lights.push_back(basic_light);
@@ -79,6 +91,22 @@ int main(int, char**)
         int last_height = 500;
 
         while (!glfwWindowShouldClose(window)) {
+
+            Eigen::Transform<double,3,Eigen::Affine> transform_a_initial =  Eigen::Transform<double,3,Eigen::Affine>::Identity();
+            transform_a_initial.translate(teapot_a_position_initial.cast<double>());
+            Eigen::Transform<double,3,Eigen::Affine> transform_a_final =  Eigen::Transform<double,3,Eigen::Affine>::Identity();
+            transform_a_final.translate(teapot_a_position_final.cast<double>());
+            Eigen::Transform<double,3,Eigen::Affine> transform_b =  Eigen::Transform<double,3,Eigen::Affine>::Identity();
+            transform_b.translate(teapot_b_position.cast<double>());
+
+            auto hit = EngiGraph::linearCCD(mesh_physics,mesh_physics,transform_a_initial.matrix(),transform_b.matrix(),transform_a_final.matrix(),transform_b.matrix());
+            Eigen::Vector3f teapot_a_position = teapot_a_position_final;
+            if(hit.has_value()){
+                double time = hit->w();
+                teapot_a_position = teapot_a_position_initial + (teapot_a_position_final - teapot_a_position_initial) *  time;
+
+            }
+
 
             glfwPollEvents();
 
@@ -95,6 +123,15 @@ int main(int, char**)
             pipeline.submitDrawCall({mesh2, albedo, Eigen::Matrix4f::Identity()});
             pipeline.submitDrawCall({mesh3, albedo2, Eigen::Matrix4f::Identity()});
 
+            Eigen::Transform<float,3,Eigen::Affine> transform =  Eigen::Transform<float,3,Eigen::Affine>::Identity();
+            pipeline.submitDrawCall({mesh_teapot_visual, albedo, transform.translate(teapot_a_position_initial).matrix()});
+            transform =  Eigen::Transform<float,3,Eigen::Affine>::Identity();
+            pipeline.submitDrawCall({mesh_teapot_visual, albedo, transform.translate(teapot_a_position_final).matrix()});
+            transform =  Eigen::Transform<float,3,Eigen::Affine>::Identity();
+            pipeline.submitDrawCall({mesh_teapot_visual, albedo, transform.translate(teapot_a_position).matrix()});
+            transform =  Eigen::Transform<float,3,Eigen::Affine>::Identity();
+            pipeline.submitDrawCall({mesh_teapot_visual, albedo2, transform.translate(teapot_b_position).matrix()});
+
             pipeline.render();
 
             auto frame_buffer = pipeline.getMainFramebuffer();
@@ -102,6 +139,12 @@ int main(int, char**)
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
+
+            if (ImGui::CollapsingHeader("CCD")) {
+                ImGui::DragFloat3("A initial", teapot_a_position_initial.data());
+                ImGui::DragFloat3("A final", teapot_a_position_final.data());
+                ImGui::DragFloat3("B position", teapot_b_position.data());
+            }
 
             if (ImGui::CollapsingHeader("Lights")) {
                 ImGui::Indent();

@@ -58,7 +58,7 @@ namespace EngiGraph {
         Eigen::Vector3d b_local = b - origin;
         Eigen::Vector3d c_local = c - origin;
 
-        //Shear and scale vertices
+        //Shear and scale vertices so that this is all in 'ray space'
         double ax = a_local[k.x()] - s.x()*a_local[k.z()];
         double ay = a_local[k.y()] - s.y()*a_local[k.z()];
         double bx = b_local[k.x()] - s.x()*b_local[k.z()];
@@ -72,12 +72,12 @@ namespace EngiGraph {
         double v = ax*cy-ay*cx;
         double w = bx*ay-by*ax;
 
-        //Edge tests
+        //Edge tests. Is it within the triangle.
         if ((u<0.0 || v<0.0 || w<0.0) && (u>0.0 || v>0.0 || w>0.0)) return false;
 
         double determinant = u + v + w;
 
-        if(determinant == 0.0) return false;
+        if(determinant == 0.0) return false; //Parallel is considered to not be a hit.
 
         //calculate hit distance
         double az = s.z()*a_local[k.z()];
@@ -95,88 +95,210 @@ namespace EngiGraph {
         return true;
     }
 
-    //todo impl https://research.nvidia.com/sites/default/files/pubs/2019-03_Cool-Patches%3A-A/Chapter_08.pdf
-    //todo impl refining approximation that is better for GPU use: https://www.reedbeta.com/blog/quadrilateral-interpolation-part-2/
-    
+    /**
+     * Linearly interpolate between values.
+     * @param a Start when t = 0.
+     * @param b End when t = 1.
+     * @param t Value.
+     * @return Lerped vector.
+     */
+    Eigen::Vector3d lerp(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const double& t) {
+        return a + (b-a) * t;
+    }
 
-    //Do linear ccd treating one mesh as a stationary triangle mesh and the other as moving points.
-    std::optional<Eigen::Vector4d> linearCCDOneWay(const Mesh &tri_mesh, const Mesh &point_mesh, const Eigen::Matrix4d &point_mesh_initial,  const Eigen::Matrix4d &point_mesh_final,const double & time){
-        double earliest = 1000000.0f;
-        std::optional<Eigen::Vector3d> earliest_point;
-        for (const auto& local_point : point_mesh.vertices) {
-            auto local_point_4 = Eigen::Vector4d (local_point.x(),local_point.y(),local_point.z(),1.0f); //todo optimize
-            Eigen::Vector3d point_initial = (point_mesh_initial * local_point_4).head<3>();
-            Eigen::Vector3d point_final = (point_mesh_final * local_point_4).head<3>();
-std::cout << point_initial << " & "<< point_final << " |\n";
+/**
+     * Intersect a ray with a bi-linear quad patch.
+     * @details This does not perform backface culling.
+     * The quad can be planar or non-planar.
+     * @see https://research.nvidia.com/sites/default/files/pubs/2019-03_Cool-Patches%3A-A/Chapter_08.pdf
+     * @param q00,q01 Vertex positions of first edge.
+     * @details First edge to second edge increases u coordinate. q00 to q10 and q01 to q11 increases v coordinate.
+     * @param q10,q11 Vertex positions of second edge.
+     * @param origin Origin of ray.
+     * @param direction Unit vector direction of ray.
+     * @param hit_info Output (u,v,distance) if hit occurs.
+     * @param max_distance Max distance the hit can be away before hit in not registered.
+     * @return True if hit occurred.
+     */
+    bool rayQuadPatchIntersection(Eigen::Vector3d q00, const Eigen::Vector3d& q01, Eigen::Vector3d q10, const Eigen::Vector3d& q11, const Eigen::Vector3d& origin, const Eigen::Vector3d& direction, Eigen::Vector3d& hit_info,
+                                  const double& max_distance){
 
-            double speed = (point_final - point_initial).norm() / time;
-            if(speed < 0.000001){
-                continue;
-            }
-            Eigen::Vector3d direction = (point_final - point_initial).normalized();
+        Eigen::Vector3d e10 = q10 - q00;
+        Eigen::Vector3d e11 = q11 - q10;
+        Eigen::Vector3d e00 = q01 - q00;
+        Eigen::Vector3d qn = (q10 - q00).cross(q01-q11); //todo precompute these values
 
+        q00 -= origin;
+        q10 -= origin;
+        //Quadratic formula coefficients
+        double a = q00.cross(direction).dot(e00);
+        double c = qn.dot(direction);
+        double b = q10.cross(direction).dot(e11) - (a + c);
 
-            for (int triangle_index = 0; triangle_index < tri_mesh.triangle_indices.size(); triangle_index += 3) {
-               //ray triangle intersection is great for our needs
-               //We do not care about what happened in the past, only the future, so a ray makes sense
-               double distance = 0.0f;
-               //todo check precision
-             //  if(rayTriangleIntersection(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+2]].cast<double>(),
-            //                              point_initial,direction,distance)){
-            //       double time_of_impact = distance / speed;
-            //       if(time_of_impact < earliest){
-             //          earliest = time_of_impact;
-                  //     earliest_point = point_initial + direction * distance;
-                //   }
-           //    }
+        double determinant = b*b - 4*a*c;
+        if(determinant < 0.0) return false; //Facing away
+        determinant = sqrt(determinant);
+
+        double u1, u2; //roots
+        double t = max_distance;
+        double u,v;
+
+        if(c == 0.0){ //Only one root
+            u1 = -a/b; u2 = -1;
+        }else{ //Two roots, computing the stable one first, then using viete's formula to get the second.
+            u1 = (-b - std::copysign(determinant,b))/2.0;
+            u2 = a/u1;
+            u1 /= c;
+        }
+        //Which root is inside the patch?
+        if(0.0 <= u1 && u1 <= 1.0) {
+            Eigen::Vector3d pa = lerp(q00, q10, u1);
+            Eigen::Vector3d pb = lerp(e00, e11, u1);
+            Eigen::Vector3d n = direction.cross(pb);
+            determinant = n.dot(n);
+            n = n.cross(pa);
+            double t1 = n.dot(pb);
+            double v1 = n.dot(direction);
+            if (t1 > 0.0 && 0.0 <= v1 && v1 <= determinant) {
+                t = t1 / determinant;
+                u = u1;
+                v = v1 / determinant;
             }
         }
+        if (0.0 <= u2 && u2 <= 1.0) {
+            Eigen::Vector3d pa = lerp(q00, q10, u2);
+            Eigen::Vector3d pb = lerp(e00, e11, u2);
+            Eigen::Vector3d n = direction.cross(pb);
+            determinant = n.dot(n);
+            n = n.cross(pa);
+            double t2 = n.dot(pb)/determinant;
+            double v2 = n.dot(direction);
+            if (0.0 <= v2 && v2 <= determinant && t > t2 && t2 > 0.0) {
+                t = t2; u = u2;
+                v = v2/determinant;
+            }
+        }
+        hit_info = {u,v,t};
+        return t < max_distance;
+    }
+
+    //todo benchmark single vs double precision
+
+    //todo impl refining triangle approximation of a bi-linear quad using https://www.reedbeta.com/blog/quadrilateral-interpolation-part-2/
+    
+
+    //Do linear ccd treating one mesh as a stationary and the other as moving.
+    //todo see if edge to edge can be done only once rather than twice(also caching the new vertex positions)
+    std::vector<Eigen::Vector4d> linearCCDOneWay(const Mesh &tri_mesh, const Mesh &point_mesh, const Eigen::Matrix4d &point_mesh_initial,  const Eigen::Matrix4d &point_mesh_final){
+        double earliest_time = 1.0f; //We do not care about anything beyond that
+        std::optional<Eigen::Vector3d> earliest_point;
+
+        //point to face ccd
+        for (const auto& local_point : point_mesh.vertices) {
+            //Transform points to initial and final positions
+            auto local_point_4 = Eigen::Vector4d (local_point.x(),local_point.y(),local_point.z(),1.0f);
+            Eigen::Vector3d point_initial = (point_mesh_initial * local_point_4).head<3>();
+            Eigen::Vector3d point_final = (point_mesh_final * local_point_4).head<3>();
+
+            //Calculate ray information
+            double point_distance = (point_final - point_initial).norm();
+            if(point_distance < 0.000001){
+                continue; //Did not move therefore can not collide.
+            }
+            Eigen::Vector3d direction = (point_final - point_initial).normalized();
+            auto k = calculateRayDimensions(direction);
+            auto s = calculateRayShearConstraints(k,direction);
+
+            //Trace ray along path of vertex
+            Eigen::Vector4d hit_info{};
+            for (int triangle_index = 0; triangle_index < tri_mesh.triangle_indices.size(); triangle_index += 3) {
+               if(rayTriangleIntersection(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+2]].cast<double>(),
+                       point_initial,hit_info,k,s)){
+                   double time = hit_info.w() / point_distance;
+                   if(time < earliest_time){
+                       earliest_time = time;
+                       earliest_point = hit_info.w() * direction + point_initial;
+                   }
+               }
+            }
+        }
+
+        //edge to edge ccd
+        for (int triangle_stay = 0; triangle_stay < tri_mesh.triangle_indices.size(); triangle_stay += 3) {
+            for (int triangle_move = 0; triangle_move < point_mesh.triangle_indices.size(); triangle_move += 3) {
+                for (int edge = 0; edge < 3; edge ++) {
+
+                    int offset_1 = edge; //index offsets to extract edge from triangles
+                    int offset_2 = (edge+1) % 3;
+
+                    //Ray is traced along the stationary edge
+                    Eigen::Vector3d stay_a = tri_mesh.vertices[tri_mesh.triangle_indices[triangle_stay+offset_1]].cast<double>();
+                    Eigen::Vector3d stay_b = tri_mesh.vertices[tri_mesh.triangle_indices[triangle_stay+offset_2]].cast<double>();
+                    double stay_edge_length = (stay_a-stay_b).norm();
+                    Eigen::Vector3d stay_direction = (stay_b-stay_a).normalized();
+
+                    //moving edge becomes a quad
+                    //todo re-use transforms from before
+                    Eigen::Vector3d move_a_local = point_mesh.vertices[point_mesh.triangle_indices[triangle_move+offset_1]].cast<double>();
+                    Eigen::Vector3d move_b_local = point_mesh.vertices[point_mesh.triangle_indices[triangle_move+offset_2]].cast<double>();
+                    Eigen::Vector3d move_a_init = (point_mesh_initial * Eigen::Vector4d (move_a_local.x(),move_a_local.y(),move_a_local.z(),1.0f)).head<3>();
+                    Eigen::Vector3d move_b_init = (point_mesh_initial * Eigen::Vector4d (move_b_local.x(),move_b_local.y(),move_b_local.z(),1.0f)).head<3>();
+                    Eigen::Vector3d move_a_final = (point_mesh_final * Eigen::Vector4d (move_a_local.x(),move_a_local.y(),move_a_local.z(),1.0f)).head<3>();
+                    Eigen::Vector3d move_b_final = (point_mesh_final * Eigen::Vector4d (move_b_local.x(),move_b_local.y(),move_b_local.z(),1.0f)).head<3>();
+
+                    Eigen::Vector3d hit_info{};
+                    if(rayQuadPatchIntersection(move_a_init,move_b_init, move_a_final,move_b_final, stay_a,stay_direction,hit_info,stay_edge_length)){
+                        double time = hit_info.x(); //u
+                        if(time < earliest_time){
+                            earliest_time = time;
+                            earliest_point = stay_a + stay_direction * hit_info.z();
+                        }
+                    }
+
+                }
+            }
+        }
+
+
         if(earliest_point){
-            return Eigen::Vector4d {earliest_point.value().x(),earliest_point.value().y(),earliest_point.value().z(),earliest};
+            return {Eigen::Vector4d {earliest_point.value().x(),earliest_point.value().y(),earliest_point.value().z(),earliest_time}};
         }
         return {};
     }
 
    std::optional<Eigen::Vector4d> linearCCD(const Mesh &a, const Mesh &b, const Eigen::Matrix4d &a_initial, const Eigen::Matrix4d &b_initial,
-              const Eigen::Matrix4d &a_final, const Eigen::Matrix4d &b_final, const double &time) {
-        //A stationary
-        std::optional<Eigen::Vector4d> b_to_a = linearCCDOneWay(a,b, a_initial.inverse() * b_initial,a_final.inverse()*b_final,time); //todo check if multiplication needs to be switched
-        std::optional<Eigen::Vector4d> a_to_b = linearCCDOneWay(b,a, b_initial.inverse() * a_initial,b_final.inverse()*a_final,time);
+              const Eigen::Matrix4d &a_final, const Eigen::Matrix4d &b_final) {
 
+        //Go both directions
+        std::vector<Eigen::Vector4d> b_to_a = linearCCDOneWay(a,b, a_initial.inverse() * b_initial,a_final.inverse()*b_final);
+        std::vector<Eigen::Vector4d> a_to_b = linearCCDOneWay(b,a, b_initial.inverse() * a_initial,b_final.inverse()*a_final);
 
-        //convert to global space
-        if(b_to_a){
-            Eigen::Vector4d b_to_a_no_time = b_to_a.value();
-            b_to_a_no_time.w() = 1.0f;
-            b_to_a_no_time = (a_initial * b_to_a_no_time);
-            b_to_a_no_time.w() = b_to_a->w();
-            b_to_a = b_to_a_no_time;
-        }
-       if(a_to_b){
-           Eigen::Vector4d a_to_b_no_time = a_to_b.value();
-           a_to_b_no_time.w() = 1.0f;
-           a_to_b_no_time = (b_initial * a_to_b_no_time);
-           a_to_b_no_time.w() = a_to_b->w();
-           a_to_b = a_to_b_no_time;
+       //convert to global space
+       for (auto& hit : b_to_a) {
+           Eigen::Vector4d hit_no_time = hit;
+           hit_no_time.w() = 1.0f;
+           hit_no_time = (a_initial * hit_no_time);
+           hit_no_time.w() = hit.w();
+           hit = hit_no_time;
+       }
+       for (auto& hit : a_to_b) {
+           Eigen::Vector4d hit_no_time = hit;
+           hit_no_time.w() = 1.0f;
+           hit_no_time = (b_initial * hit_no_time);
+           hit_no_time.w() = hit.w();
+           hit = hit_no_time;
        }
 
+       //Get earliest hit.
+       std::vector<Eigen::Vector4d> hits = b_to_a;
+       hits.insert(hits.end(), a_to_b.begin(), a_to_b.end());
+       if(hits.empty()) return std::nullopt;
+       std::sort(hits.begin(), hits.end(), [](const Eigen::Vector4d& a, const Eigen::Vector4d& b) { //sort by time in ascending order
+           return a.w() < b.w();
+       });
 
-        //todo optimize
-        // Get the earliest time
-        if(!b_to_a && !a_to_b){
-            return {};
-        }
-        if(!b_to_a && a_to_b){
-            return a_to_b;
-        }
-        if(b_to_a && !a_to_b){
-            return b_to_a;
-        }
-        if(b_to_a->w() < a_to_b->w()){
-            return b_to_a;
-        }else{
-            return a_to_b;
-        }
+       Eigen::Vector4d earliest = hits[0];
+       return earliest;
     }
 
 } // EngiGraph
