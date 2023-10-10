@@ -10,6 +10,7 @@
 #include "Rendering/OpenGL/PipeLines/DeferredPipelineOgl.h"
 #include "src/Geometry/MeshConversions.h"
 #include "src/Physics/Collisions/LinearPointCcd.h"
+#include "src/Physics/TOISolver/ToiSolver.h"
 
 #include <GLFW/glfw3.h>
 
@@ -49,6 +50,8 @@ int main(int, char**)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+
+
     //Error can now be caught and displayed in a user-friendly gui.
     try {
 
@@ -60,29 +63,38 @@ int main(int, char**)
 
         auto pipeline = EngiGraph::DeferredPipelineOgl(500, 500, camera);
 
-        auto meshes = EngiGraph::loadOBJ("meshes/mori_knob.obj");
-        auto mesh = EngiGraph::loadMeshOgl(meshes[0]);
-        auto mesh2 = EngiGraph::loadMeshOgl(meshes[1]);
-        auto mesh3 = EngiGraph::loadMeshOgl(meshes[4]);
+        auto albedo_orange = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_orange.png"));
+        auto albedo_blue = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_blue.png"));
 
-        auto albedo = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_orange.png"));
-        auto albedo2 = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_blue.png"));
+        auto mesh_sphere = EngiGraph::loadOBJ("meshes/unit_sphere.obj")[0];
+        auto mesh_cube = EngiGraph::loadOBJ("test_files/cube.obj")[0];
+        auto mesh_cube_visual = EngiGraph::loadMeshOgl(mesh_cube);
+        auto mesh_cube_physics = std::make_shared<EngiGraph::Mesh>(EngiGraph::stripVisualMesh(mesh_cube));
+        auto mesh_sphere_visual = EngiGraph::loadMeshOgl(mesh_sphere);
+        auto mesh_sphere_physics = std::make_shared<EngiGraph::Mesh>(EngiGraph::stripVisualMesh(mesh_sphere));
 
-        auto mesh_teapot = EngiGraph::loadOBJ("meshes/unit_sphere.obj")[0];
-        auto mesh_teapot_visual = EngiGraph::loadMeshOgl(mesh_teapot);
-        auto mesh_physics = EngiGraph::stripVisualMesh(mesh_teapot);
+        EngiGraph::TOISolver solver;
+
+
+
+        solver.bodies.push_back(EngiGraph::TOISolver::RigidBody{
+                {0,2,0},Eigen::Quaterniond::Identity(),{0,0,0},{0,0,0},Eigen::Matrix4d::Identity(), Eigen::Matrix4d::Identity(),mesh_sphere_physics,mesh_sphere_visual,albedo_blue,1.0f,Eigen::Matrix3d::Identity(),{0,0,0}
+        });
+
+        solver.bodies.push_back(EngiGraph::TOISolver::RigidBody{
+                {0,-2,0},Eigen::Quaterniond::Identity(),{0,0,0},{0,0,0},Eigen::Matrix4d::Identity(), Eigen::Matrix4d::Identity(),mesh_cube_physics,mesh_cube_visual,albedo_orange,1.0f,Eigen::Matrix3d::Identity(),{0,0,0},
+                false
+        });
+
+
 
 
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
         Eigen::Vector3f cam_pos = {5.0f, 5.0f, 5.0f};
         Eigen::Vector3f cam_look = {0, 0, 0};
 
-        Eigen::Vector3f teapot_a_position_initial = {2.0,2.0,2.0};
-        Eigen::Vector3f teapot_a_position_final = {1.0,1.0,1.0};
-        Eigen::Vector3f teapot_b_position = {1.5,1.5,1.5};
-
-
         EngiGraph::DeferredPipelineOgl::PointLight basic_light{{0,0,0},{1,1,1}};
+        pipeline.ambient_color = {1.0,1.0,1.0};
         pipeline.point_lights.push_back(basic_light);
 
         int width = 500;
@@ -90,25 +102,17 @@ int main(int, char**)
         int last_width = 500;
         int last_height = 500;
 
+        std::vector<EngiGraph::TOISolver::RigidBody> last_rigidbody_data;
+
+        float delta_time = 0.01;
+
+        bool step = false;
+
+        solver.step(delta_time);
+
         while (!glfwWindowShouldClose(window)) {
-
-            Eigen::Transform<double,3,Eigen::Affine> transform_a_initial =  Eigen::Transform<double,3,Eigen::Affine>::Identity();
-            transform_a_initial.translate(teapot_a_position_initial.cast<double>());
-            Eigen::Transform<double,3,Eigen::Affine> transform_a_final =  Eigen::Transform<double,3,Eigen::Affine>::Identity();
-            transform_a_final.translate(teapot_a_position_final.cast<double>());
-            Eigen::Transform<double,3,Eigen::Affine> transform_b =  Eigen::Transform<double,3,Eigen::Affine>::Identity();
-            transform_b.translate(teapot_b_position.cast<double>());
-
-            auto hit = EngiGraph::linearCCD(mesh_physics,mesh_physics,transform_a_initial.matrix(),transform_b.matrix(),transform_a_final.matrix(),transform_b.matrix());
-            Eigen::Vector3f teapot_a_position = teapot_a_position_final;
-            if(hit.has_value()){
-                double time = hit->w();
-                teapot_a_position = teapot_a_position_initial + (teapot_a_position_final - teapot_a_position_initial) *  time;
-
-            }
-
-
             glfwPollEvents();
+
 
             if (width != last_width || height != last_height) {
                 last_width = width;
@@ -116,22 +120,10 @@ int main(int, char**)
                 pipeline.resize(width, height);
             }
 
-            pipeline.camera.setPosition(cam_pos);
-            pipeline.camera.setLookTarget(cam_look);
 
-            pipeline.submitDrawCall({mesh, albedo, Eigen::Matrix4f::Identity()});
-            pipeline.submitDrawCall({mesh2, albedo, Eigen::Matrix4f::Identity()});
-            pipeline.submitDrawCall({mesh3, albedo2, Eigen::Matrix4f::Identity()});
-
-            Eigen::Transform<float,3,Eigen::Affine> transform =  Eigen::Transform<float,3,Eigen::Affine>::Identity();
-            pipeline.submitDrawCall({mesh_teapot_visual, albedo, transform.translate(teapot_a_position_initial).matrix()});
-            transform =  Eigen::Transform<float,3,Eigen::Affine>::Identity();
-            pipeline.submitDrawCall({mesh_teapot_visual, albedo, transform.translate(teapot_a_position_final).matrix()});
-            transform =  Eigen::Transform<float,3,Eigen::Affine>::Identity();
-            pipeline.submitDrawCall({mesh_teapot_visual, albedo, transform.translate(teapot_a_position).matrix()});
-            transform =  Eigen::Transform<float,3,Eigen::Affine>::Identity();
-            pipeline.submitDrawCall({mesh_teapot_visual, albedo2, transform.translate(teapot_b_position).matrix()});
-
+            for (const auto& body : solver.bodies) {
+                pipeline.submitDrawCall(EngiGraph::DeferredPipelineOgl::DrawCall{body.render_mesh,body.render_texture,body.initial_transform.cast<float>()});
+            }
             pipeline.render();
 
             auto frame_buffer = pipeline.getMainFramebuffer();
@@ -140,11 +132,48 @@ int main(int, char**)
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            if (ImGui::CollapsingHeader("CCD")) {
-                ImGui::DragFloat3("A initial", teapot_a_position_initial.data());
-                ImGui::DragFloat3("A final", teapot_a_position_final.data());
-                ImGui::DragFloat3("B position", teapot_b_position.data());
+            if(ImGui::CollapsingHeader("Physics")){
+                ImGui::DragFloat("delta time", &delta_time,0.001f,0.0001f);
+                if(ImGui::Button("Step")){
+                    solver.step(delta_time);
+                }
+                if(step){
+                    if(ImGui::Button("Stop")){
+                        solver.bodies = last_rigidbody_data;
+                        solver.step(delta_time);
+                        step = false;
+                    }
+                }else{
+                    if(ImGui::Button("Start")){
+                        last_rigidbody_data = solver.bodies;
+                        step = true;
+                    }
+                }
+
+                ImGui::Indent();
+                int i = 0;
+                for ( auto& body : solver.bodies) {
+                    ImGui::PushID(i);
+                    i++;
+                    if (ImGui::CollapsingHeader("Body")) {
+                        if(ImGui::DragScalarN("Position", ImGuiDataType_Double,body.position.data(),3)){
+                            Eigen::Transform<double,3,Eigen::Affine> transform_initial = Eigen::Transform<double,3,Eigen::Affine>::Identity();
+                            transform_initial.translate(body.position).rotate(body.rotation);
+                            body.initial_transform = transform_initial.matrix();
+                        }
+
+                        ImGui::DragScalarN("Velocity", ImGuiDataType_Double,body.velocity.data(),3);
+                        ImGui::DragScalarN("Angular Velocity", ImGuiDataType_Double,body.angular_velocity.data(),3);
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::Unindent();
             }
+
+            if(step){
+                solver.step(delta_time);
+            }
+
 
             if (ImGui::CollapsingHeader("Lights")) {
                 ImGui::Indent();
@@ -169,8 +198,12 @@ int main(int, char**)
             }
 
             if (ImGui::CollapsingHeader("Camera")) {
-                ImGui::DragFloat3("Position", cam_pos.data());
-                ImGui::DragFloat3("Target", cam_look.data());
+                if(ImGui::DragFloat3("Position", cam_pos.data())){
+                    pipeline.camera.setPosition(cam_pos);
+                }
+                if(ImGui::DragFloat3("Target", cam_look.data())){
+                    pipeline.camera.setLookTarget(cam_look);
+                }
             }
             if (ImGui::CollapsingHeader("World")) {
                 ImGui::ColorEdit3("Ambient", pipeline.ambient_color.data());

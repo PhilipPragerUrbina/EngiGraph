@@ -214,3 +214,5 @@ TEST(INTERSECTION_TESTS, TEST_RAY_PATCH){
     d = {0.0,1.0,1.0};
     ASSERT_TRUE(EngiGraph::rayQuadPatchIntersection(a,b,c,d,origin,direction,hit_info,100.0));
 }
+
+//todo unit test ccd
