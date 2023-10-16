@@ -76,6 +76,9 @@ int main(int, char**)
         EngiGraph::TOISolver solver;
 
 
+        solver.bodies.push_back(EngiGraph::TOISolver::RigidBody{
+                {0,6,0},Eigen::Quaterniond::Identity(),{0,0,0},{0,0,0},Eigen::Matrix4d::Identity(), Eigen::Matrix4d::Identity(),mesh_sphere_physics,mesh_sphere_visual,albedo_blue,1.0f,Eigen::Matrix3d::Identity(),{0,0,0}
+        });
 
         solver.bodies.push_back(EngiGraph::TOISolver::RigidBody{
                 {0,2,0},Eigen::Quaterniond::Identity(),{0,0,0},{0,0,0},Eigen::Matrix4d::Identity(), Eigen::Matrix4d::Identity(),mesh_sphere_physics,mesh_sphere_visual,albedo_blue,1.0f,Eigen::Matrix3d::Identity(),{0,0,0}

@@ -182,6 +182,10 @@ namespace EngiGraph {
         return t < max_distance;
     }
 
+    Eigen::Vector3d getNormal(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const Eigen::Vector3d& c){
+        return  (b - a).cross(a - c).normalized();
+    }
+
     //todo benchmark single vs double precision
 
     //todo impl refining triangle approximation of a bi-linear quad using https://www.reedbeta.com/blog/quadrilateral-interpolation-part-2/
@@ -189,9 +193,9 @@ namespace EngiGraph {
 
     //Do linear ccd treating one mesh as a stationary and the other as moving.
     //todo see if edge to edge can be done only once rather than twice(also caching the new vertex positions)
-    std::vector<Eigen::Vector4d> linearCCDOneWay(const Mesh &tri_mesh, const Mesh &point_mesh, const Eigen::Matrix4d &point_mesh_initial,  const Eigen::Matrix4d &point_mesh_final){
+    std::vector<CCDHit> linearCCDOneWay(const Mesh &tri_mesh, const Mesh &point_mesh, const Eigen::Matrix4d &point_mesh_initial,  const Eigen::Matrix4d &point_mesh_final){
         double earliest_time = 1.0f; //We do not care about anything beyond that
-        std::optional<Eigen::Vector3d> earliest_point;
+        std::optional<CCDHit> earliest_point;
 
         //point to face ccd
         for (const auto& local_point : point_mesh.vertices) {
@@ -217,7 +221,12 @@ namespace EngiGraph {
                    double time = hit_info.w() / point_distance;
                    if(time < earliest_time){
                        earliest_time = time;
-                       earliest_point = hit_info.w() * direction + point_initial;
+                       CCDHit hit{};
+                       hit.time = time;
+                       hit.global_point = hit_info.w() * direction + point_initial;
+                       hit.normal_a_to_b = getNormal(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+2]].cast<double>());
+                       hit.normal_a_to_b *= hit.normal_a_to_b.dot(point_initial-hit.global_point)<0.0 ? -1.0 : 1.0;
+                       earliest_point = hit;
                    }
                }
             }
@@ -241,17 +250,30 @@ namespace EngiGraph {
                     //todo re-use transforms from before
                     Eigen::Vector3d move_a_local = point_mesh.vertices[point_mesh.triangle_indices[triangle_move+offset_1]].cast<double>();
                     Eigen::Vector3d move_b_local = point_mesh.vertices[point_mesh.triangle_indices[triangle_move+offset_2]].cast<double>();
+
+
                     Eigen::Vector3d move_a_init = (point_mesh_initial * Eigen::Vector4d (move_a_local.x(),move_a_local.y(),move_a_local.z(),1.0f)).head<3>();
                     Eigen::Vector3d move_b_init = (point_mesh_initial * Eigen::Vector4d (move_b_local.x(),move_b_local.y(),move_b_local.z(),1.0f)).head<3>();
                     Eigen::Vector3d move_a_final = (point_mesh_final * Eigen::Vector4d (move_a_local.x(),move_a_local.y(),move_a_local.z(),1.0f)).head<3>();
                     Eigen::Vector3d move_b_final = (point_mesh_final * Eigen::Vector4d (move_b_local.x(),move_b_local.y(),move_b_local.z(),1.0f)).head<3>();
+
+                    if((move_a_init-move_a_final).norm() < 0.000001 || (move_b_init-move_b_final).norm() < 0.000001){
+                        continue;
+                    }
 
                     Eigen::Vector3d hit_info{};
                     if(rayQuadPatchIntersection(move_a_init,move_b_init, move_a_final,move_b_final, stay_a,stay_direction,hit_info,stay_edge_length)){
                         double time = hit_info.x(); //u
                         if(time < earliest_time){
                             earliest_time = time;
-                            earliest_point = stay_a + stay_direction * hit_info.z();
+
+                            CCDHit hit{};
+                            hit.time = time;
+                            hit.global_point =stay_a + stay_direction * hit_info.z();
+                            hit.normal_a_to_b = getNormal(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_stay+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_stay+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_stay+2]].cast<double>());
+                            hit.normal_a_to_b *= hit.normal_a_to_b.dot(move_a_init-hit.global_point)<0.0 ? -1.0 : 1.0;
+                            earliest_point = hit;
+
                         }
                     }
 
@@ -261,43 +283,38 @@ namespace EngiGraph {
 
 
         if(earliest_point){
-            return {Eigen::Vector4d {earliest_point.value().x(),earliest_point.value().y(),earliest_point.value().z(),earliest_time}};
+            return {earliest_point.value()};
         }
         return {};
     }
 
-   std::optional<Eigen::Vector4d> linearCCD(const Mesh &a, const Mesh &b, const Eigen::Matrix4d &a_initial, const Eigen::Matrix4d &b_initial,
+   std::optional<CCDHit> linearCCD(const Mesh &a, const Mesh &b, const Eigen::Matrix4d &a_initial, const Eigen::Matrix4d &b_initial,
               const Eigen::Matrix4d &a_final, const Eigen::Matrix4d &b_final) {
 
         //Go both directions
-        std::vector<Eigen::Vector4d> b_to_a = linearCCDOneWay(a,b, a_initial.inverse() * b_initial,a_final.inverse()*b_final);
-        std::vector<Eigen::Vector4d> a_to_b = linearCCDOneWay(b,a, b_initial.inverse() * a_initial,b_final.inverse()*a_final);
+        std::vector<CCDHit> b_to_a = linearCCDOneWay(a,b, a_initial.inverse() * b_initial,a_final.inverse()*b_final);
+        std::vector<CCDHit> a_to_b = linearCCDOneWay(b,a, b_initial.inverse() * a_initial,b_final.inverse()*a_final);
 
        //convert to global space
        for (auto& hit : b_to_a) {
-           Eigen::Vector4d hit_no_time = hit;
-           hit_no_time.w() = 1.0f;
-           hit_no_time = (a_initial * hit_no_time);
-           hit_no_time.w() = hit.w();
-           hit = hit_no_time;
+           hit.global_point = (a_initial * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>();
+           hit.normal_a_to_b = (a_initial.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b;
        }
        for (auto& hit : a_to_b) {
-           Eigen::Vector4d hit_no_time = hit;
-           hit_no_time.w() = 1.0f;
-           hit_no_time = (b_initial * hit_no_time);
-           hit_no_time.w() = hit.w();
-           hit = hit_no_time;
+           hit.global_point = (b_initial * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>();
+           hit.normal_a_to_b *= -1.0;
+           hit.normal_a_to_b = (b_initial.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b;
        }
 
        //Get earliest hit.
-       std::vector<Eigen::Vector4d> hits = b_to_a;
+       std::vector<CCDHit> hits = b_to_a;
        hits.insert(hits.end(), a_to_b.begin(), a_to_b.end());
        if(hits.empty()) return std::nullopt;
-       std::sort(hits.begin(), hits.end(), [](const Eigen::Vector4d& a, const Eigen::Vector4d& b) { //sort by time in ascending order
-           return a.w() < b.w();
+       std::sort(hits.begin(), hits.end(), [](const CCDHit& a, const CCDHit& b) { //sort by time in ascending order
+           return a.time < b.time;
        });
 
-       Eigen::Vector4d earliest = hits[0];
+       CCDHit earliest = hits[0];
        return earliest;
     }
 

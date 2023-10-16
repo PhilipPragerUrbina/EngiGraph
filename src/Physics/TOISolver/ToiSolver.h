@@ -81,42 +81,62 @@ namespace EngiGraph {
             for (uint32_t body_a = 0; body_a < bodies.size(); ++body_a) {
                 for (uint32_t body_b = body_a+1; body_b < bodies.size(); ++body_b) {
                     auto sub_hits = linearCCD(*bodies[body_a].collider, *bodies[body_b].collider, bodies[body_a].initial_transform,bodies[body_b].initial_transform,bodies[body_a].final_transform, bodies[body_b].final_transform);
-                    if(sub_hits && sub_hits->w() < 1.0f){
-                        Eigen::Vector3d normal_a_to_b; //todo get
-                        hits.push_back(Hit{sub_hits->w(),normal_a_to_b,sub_hits->head<3>(),body_a,body_b});
+                    if(sub_hits && sub_hits->time < 1.0f){
+                       // std::cout << body_a << " " << body_b << " i:" << 0 << " t: " << sub_hits->w() << "\n";
+                        Eigen::Vector3d normal_a_to_b = sub_hits->normal_a_to_b;
+                        hits.push_back(Hit{sub_hits->time,normal_a_to_b,sub_hits->global_point,body_a,body_b});
                     }
                 }
             }
             //sort by time in ascending order
             std::sort(hits.begin(), hits.end(), [](const TOISolver::Hit& a, const TOISolver::Hit& b) {return a.time < b.time;});
 
-            const double rollback_margin = delta_time/100.0;
+
+
+            //todo fix wierd bug where the two spheres seem to be linked for no reason. Moving one affects the other in drastic ways despite not touching nor colliding.
+            //It is almost like on collision with the cube, they get mixed up sometimes. For example, by default, the top sphere seems to react to the bottom sphere hitting the box.
+            //Or speeding up the top sphere, causes the bottom sphere to glitch really fast when it hits the box.
+            //This is clearly an implementation bug, as in theory these should not be affecting each other at all. Potentially some indices are getting mixed up somewhere?
 
             int i = 0;
             while (!hits.empty()){
+                const double rollback_margin = time_remaining/100.0;
                 i++;
-                if(i > 1000) throw RuntimeException("Not able to resolve collisions");
-                Hit earliest = hits[0];
-                //bodies[earliest.a].velocity = {0,0,0};
-                if(bodies[earliest.a].gravity){
-                    Eigen::Vector3d velocity = getVelocityAtPoint(bodies[earliest.a],earliest.point);
-                    velocity *= -1.0;
-                    setVelocityAtPoint(bodies[earliest.a],earliest.point,velocity);
-                }
-               // bodies[earliest.b].velocity = {0,0,0};
-                if(bodies[earliest.b].gravity){
-                    Eigen::Vector3d velocity = getVelocityAtPoint(bodies[earliest.b],earliest.point);
-                    velocity *= -1.0;
-                    setVelocityAtPoint(bodies[earliest.b],earliest.point,velocity);
+                if(i > 1000) {
+                    std::cout << "Warning: not able to properly resolve collision! \n";
+                    break;
                 }
 
-                double current_time = earliest.time * time_remaining - rollback_margin;
+                double t_last = hits[0].time;
+                //careful this is not working right since the negatives are flipping
+                for (int k = 0; k < 10; ++k) { //velocity solve iters
+                    for (const auto& earliest : hits) {
+                        if(abs(earliest.time - t_last) > rollback_margin/2.0){
+                            break;
+                        }
+                     //   std::cout << earliest.normal_a_to_b << "n\n";
+                        if(bodies[earliest.a].gravity){
+                            Eigen::Vector3d velocity = getVelocityAtPoint(bodies[earliest.a],earliest.point);
+                            velocity *= -1.0;
+                            setVelocityAtPoint(bodies[earliest.a],earliest.point,velocity);
+                        }
+                        if(bodies[earliest.b].gravity){
+                            Eigen::Vector3d velocity = getVelocityAtPoint(bodies[earliest.b],earliest.point);
+                            velocity *= -1.0;
+                            setVelocityAtPoint(bodies[earliest.b],earliest.point,velocity);
+                        }
+                    }
+                }
+
+
+                double current_time = t_last * time_remaining - rollback_margin;
                 if(current_time <= 0.0){
-                    //???
+                   // current_time = 0.0;
                 }
 
                 time_remaining -= current_time;
                 if(time_remaining <= 0.0){
+                    time_remaining = 0.0;
                     break;
                 }
 
@@ -148,9 +168,11 @@ namespace EngiGraph {
                 for (uint32_t body_a = 0; body_a < bodies.size(); ++body_a) {
                     for (uint32_t body_b = body_a+1; body_b < bodies.size(); ++body_b) {
                         auto sub_hits = linearCCD(*bodies[body_a].collider, *bodies[body_b].collider, bodies[body_a].initial_transform,bodies[body_b].initial_transform,bodies[body_a].final_transform, bodies[body_b].final_transform);
-                        if(sub_hits && sub_hits->w() < 1.0f){
-                            Eigen::Vector3d normal_a_to_b; //todo get
-                            hits.push_back(Hit{sub_hits->w(),normal_a_to_b,sub_hits->head<3>(),body_a,body_b});
+                        if(sub_hits && sub_hits->time < 1.0f){
+                            std::cout << body_a << " " << body_b << " i:" << i << " t: " << sub_hits->time << " p:" << sub_hits.value().global_point << "\n";
+                            //todo what the heck this is passing back negative 0? This should not be passing back anything. It might have to do when one of the bodies is at rest. It only happens when the bodies are in line.
+                            Eigen::Vector3d normal_a_to_b = sub_hits->normal_a_to_b; //todo get
+                            hits.push_back(Hit{sub_hits->time,normal_a_to_b,sub_hits->global_point,body_a,body_b});
                         }
                     }
                 }
