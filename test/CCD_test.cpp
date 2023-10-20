@@ -4,6 +4,8 @@
 #include "gtest/gtest.h"
 #include "../src/Physics/Collisions/LinearPointCcd.h"
 #include "../src/Physics/Collisions/LinearPointCcd.cpp"
+#include "src/FileIO/ObjLoader.h"
+#include "src/Geometry/MeshConversions.h"
 
 TEST(INTERSECTION_TESTS, TEST_WATERTIGHT_RAY_TRIANGLE){
     //Test a prerequisite ray functions.
@@ -215,4 +217,79 @@ TEST(INTERSECTION_TESTS, TEST_RAY_PATCH){
     ASSERT_TRUE(EngiGraph::rayQuadPatchIntersection(a,b,c,d,origin,direction,hit_info,100.0));
 }
 
-//todo unit test ccd
+TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
+    //Test helper functions
+    {
+        Eigen::Vector3d a {0.0,0.0,0.0};
+        Eigen::Vector3d b {1.0,0.0,0.0};
+        Eigen::Vector3d c {1.0,1.0,0.0};
+        auto normal = EngiGraph::getNormal(a,b,c);
+        Eigen::Vector3d expected = {0.0,0.0,-1.0};
+        ASSERT_EQ(normal,expected);
+    }
+    {
+        //normal between equal edges
+        Eigen::Vector3d a_1 {1,0,0};
+        Eigen::Vector3d a_2 {-1,0,0};
+        Eigen::Vector3d b_1 {1,0,0};
+        Eigen::Vector3d b_2 {-1,0,0};
+        auto normal = EngiGraph::getNormalEdgeToEdge(a_1,a_2,b_1,b_2);
+        Eigen::Vector3d expected = {1.0,0.0,0.0}; //Arbitrary normal
+        ASSERT_EQ(normal,expected);
+    }
+    {
+        //normal between parallel edges
+        Eigen::Vector3d a_1 {1,-5,5};
+        Eigen::Vector3d a_2 {-1,-5,5};
+        Eigen::Vector3d b_1 {1,5,-5};
+        Eigen::Vector3d b_2 {-1,5,-5};
+        auto normal = EngiGraph::getNormalEdgeToEdge(a_1,a_2,b_1,b_2);
+        Eigen::Vector3d expected = {0.0,0.707107,-0.707107}; //Arbitrary normal
+        ASSERT_TRUE((expected-normal).norm() < 0.0001);
+    }
+    {
+        //normal between edges
+        Eigen::Vector3d a_1 {1,0,0};
+        Eigen::Vector3d a_2 {-1,0,0};
+        Eigen::Vector3d b_1 {0,1,0};
+        Eigen::Vector3d b_2 {0,-1,0};
+        auto normal = EngiGraph::getNormalEdgeToEdge(a_1,a_2,b_1,b_2);
+        Eigen::Vector3d expected = {0.0,0.0,1.0}; //Polarity does not matter
+        ASSERT_EQ(normal,expected);
+    }
+
+    auto raw_mesh_cube = EngiGraph::loadOBJ("./test_files/cube.obj");
+    auto mesh_cube = EngiGraph::stripVisualMesh(raw_mesh_cube[0]);
+
+    Eigen::Transform<double,3,Eigen::Affine> transform_a_initial = Eigen::Transform<double,3,Eigen::Affine>::Identity();
+    transform_a_initial.translate(Eigen::Vector3d {0.0,0.0,5.0});
+    Eigen::Transform<double,3,Eigen::Affine> transform_a_final = Eigen::Transform<double,3,Eigen::Affine>::Identity();
+    transform_a_final.translate(Eigen::Vector3d {0.0,0.0,-5.0});
+    Eigen::Transform<double,3,Eigen::Affine> transform_b_initial = Eigen::Transform<double,3,Eigen::Affine>::Identity();
+
+    Eigen::Transform<double,3,Eigen::Affine> transform_b_final = Eigen::Transform<double,3,Eigen::Affine>::Identity();
+
+    auto result = EngiGraph::linearCCD(mesh_cube,mesh_cube,transform_a_initial.matrix(),transform_b_initial.matrix(),transform_a_final.matrix(),transform_b_final.matrix());
+
+    for (const auto& result_sub : result) {
+        //todo time is right, normal is right, position is completely wrong, points are not being filtered.
+        //todo do we want hits reported from both sides?
+        std::cout <<  " { \n";
+        std::cout << result_sub.time << " time \n";
+        std::cout << result_sub.normal_a_to_b << " normal \n";
+        std::cout << result_sub.global_point << " pos \n";
+        std::cout <<  " } \n";
+    }
+
+    ASSERT_TRUE(false);
+
+    //todo false tests
+    //todo true tests
+    //todo edge case tests
+    //todo real world tests
+    //todo obvious tests
+    //todo targeted tests two way.
+
+}
+
+

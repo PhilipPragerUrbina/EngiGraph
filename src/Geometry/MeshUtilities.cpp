@@ -2,6 +2,7 @@
 // Created by Philip on 10/4/2023.
 //
 
+#include <unordered_set>
 #include "MeshUtilities.h"
 
 namespace EngiGraph {
@@ -35,7 +36,25 @@ namespace EngiGraph {
         for (auto input_index : input.triangle_indices) {
             indices.push_back(vertex_mappings[input_index]);
         }
-        return {vertices,indices};
+
+        //Generate unique edges
+        std::unordered_set<uint64_t> edge_indices_set;
+        //Encode edges as 64 bit indices hash: https://stackoverflow.com/questions/6064566/concatenate-two-32bit-numbers-to-get-a-64bit-result
+        for (int tri_id = 0; tri_id < indices.size(); tri_id+=3) {
+            edge_indices_set.emplace(((uint64_t)indices[tri_id+0] << 32) | indices[tri_id+1]);
+            edge_indices_set.emplace(((uint64_t)indices[tri_id+1] << 32) | indices[tri_id+2]);
+            edge_indices_set.emplace(((uint64_t)indices[tri_id+2] << 32) | indices[tri_id+0]);
+            //todo check that winding order is consistent
+        }
+        //convert
+        std::vector<uint32_t> edge_indices;
+        edge_indices.reserve(edge_indices_set.size() * 2);
+        for (const auto& edge : edge_indices_set) {
+            edge_indices.push_back(((const uint32_t*)&edge)[0]);
+            edge_indices.push_back(((const uint32_t*)&edge)[1]);
+        }
+
+        return {vertices,indices, edge_indices};
     }
 
 } // EngiGraph

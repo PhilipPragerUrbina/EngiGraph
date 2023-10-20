@@ -4,17 +4,25 @@
 
 #pragma once
 #include <Eigen>
-#include <optional>
 #include "./src/Geometry/Mesh.h"
 
 namespace EngiGraph {
 
     /**
-     * A single CCD collision point
+     * Hit information for a single CCD hit point.
      */
     struct CCDHit{
+        /**
+         * Time of collision relative to the start CCD position.
+         */
         double time;
+        /**
+         * The global position of the collision point.
+         */
         Eigen::Vector3d global_point;
+        /**
+         * The global normal of the contact, facing b.
+         */
         Eigen::Vector3d normal_a_to_b;
     };
 
@@ -25,9 +33,8 @@ namespace EngiGraph {
      * @param a_final,b_final Global target positions at end of time step.
      * @details Time is 0 at initial and 1 at final.
      * @warning Since this linearly interpolates the movement of vertices, some amount of deformation may happen if transformation rotates points.
-     * @return Earliest global collision point, with time relative to start position. Or none if no collision.
-     * //todo return multiple contact points
+     * @return Earliest collision. May return multiple collision points if they happen at the same time.
      */
-    std::optional<CCDHit> linearCCD(const Mesh& a, const Mesh& b, const Eigen::Matrix4d& a_initial, const Eigen::Matrix4d& b_initial,const Eigen::Matrix4d& a_final, const Eigen::Matrix4d& b_final);
+    std::vector<CCDHit> linearCCD(const Mesh& a, const Mesh& b, const Eigen::Matrix4d& a_initial, const Eigen::Matrix4d& b_initial,const Eigen::Matrix4d& a_final, const Eigen::Matrix4d& b_final);
 
 } // EngiGraph

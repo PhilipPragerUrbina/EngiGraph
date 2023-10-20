@@ -22,6 +22,13 @@ namespace EngiGraph {
          */
         std::vector<uint32_t> triangle_indices;
 
+        /**
+         * Indices of edges.
+         * Each edge is unique. No two edges reference the same two vertices in any order.
+         * @details Every 2 indices makes a edge. Indices reference vertex array.
+        */
+        std::vector<uint32_t> edge_indices;
+
     };
 
 } // EngiGraph

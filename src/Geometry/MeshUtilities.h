@@ -10,9 +10,10 @@ namespace EngiGraph {
 
     /**
      * Take in an invalid mesh with non-unique vertices, and make the vertices be unique.
+     * Also generates unique edges.
      * @param input Input mesh.
      * @param combine_delta Maximum distance from which vertices are considered to be equal.
-     * @return Mesh with unique vertices.
+     * @return Mesh with unique vertices and edges .
      */
     Mesh reduceMesh(const Mesh& input, float combine_delta = 0.001f);
 

@@ -19,6 +19,7 @@ TEST(UTILITY_TESTS, TEST_MESH_REDUCTION) {
 
     ASSERT_EQ(expected_indices.size(),reduced_mesh.triangle_indices.size());
     ASSERT_EQ(expected_vertices.size(),reduced_mesh.vertices.size());
+    ASSERT_EQ(10,reduced_mesh.edge_indices.size());
 
     //Check that indices are correct
     for (int j = 0; j < expected_indices.size(); ++j) {

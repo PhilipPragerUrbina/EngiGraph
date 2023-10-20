@@ -81,11 +81,11 @@ namespace EngiGraph {
             for (uint32_t body_a = 0; body_a < bodies.size(); ++body_a) {
                 for (uint32_t body_b = body_a+1; body_b < bodies.size(); ++body_b) {
                     auto sub_hits = linearCCD(*bodies[body_a].collider, *bodies[body_b].collider, bodies[body_a].initial_transform,bodies[body_b].initial_transform,bodies[body_a].final_transform, bodies[body_b].final_transform);
-                    if(sub_hits && sub_hits->time < 1.0f){
+                //    if(sub_hits && sub_hits->time < 1.0f){
                        // std::cout << body_a << " " << body_b << " i:" << 0 << " t: " << sub_hits->w() << "\n";
-                        Eigen::Vector3d normal_a_to_b = sub_hits->normal_a_to_b;
-                        hits.push_back(Hit{sub_hits->time,normal_a_to_b,sub_hits->global_point,body_a,body_b});
-                    }
+                    //    Eigen::Vector3d normal_a_to_b = sub_hits->normal_a_to_b;
+                    //    hits.push_back(Hit{sub_hits->time,normal_a_to_b,sub_hits->global_point,body_a,body_b});
+                 //   }
                 }
             }
             //sort by time in ascending order
@@ -168,11 +168,11 @@ namespace EngiGraph {
                 for (uint32_t body_a = 0; body_a < bodies.size(); ++body_a) {
                     for (uint32_t body_b = body_a+1; body_b < bodies.size(); ++body_b) {
                         auto sub_hits = linearCCD(*bodies[body_a].collider, *bodies[body_b].collider, bodies[body_a].initial_transform,bodies[body_b].initial_transform,bodies[body_a].final_transform, bodies[body_b].final_transform);
-                        if(sub_hits && sub_hits->time < 1.0f){
-                            std::cout << body_a << " " << body_b << " i:" << i << " t: " << sub_hits->time << " p:" << sub_hits.value().global_point << "\n";
+                      //  if(sub_hits && sub_hits->time < 1.0f){
+                        //    std::cout << body_a << " " << body_b << " i:" << i << " t: " << sub_hits->time << " p:" << sub_hits.value().global_point << "\n";
                             //todo what the heck this is passing back negative 0? This should not be passing back anything. It might have to do when one of the bodies is at rest. It only happens when the bodies are in line.
-                            Eigen::Vector3d normal_a_to_b = sub_hits->normal_a_to_b; //todo get
-                            hits.push_back(Hit{sub_hits->time,normal_a_to_b,sub_hits->global_point,body_a,body_b});
+                        //    Eigen::Vector3d normal_a_to_b = sub_hits->normal_a_to_b; //todo get
+                     //       hits.push_back(Hit{sub_hits->time,normal_a_to_b,sub_hits->global_point,body_a,body_b});
                         }
                     }
                 }
@@ -185,18 +185,18 @@ namespace EngiGraph {
 
 
             //integrate until timestep ends
-            for (auto& body : bodies) {
-                body.position += body.velocity * time_remaining;
-                Eigen::Quaterniond final_rotation = Eigen::Quaterniond(0, time_remaining * 0.5 *body.angular_velocity.x(),  time_remaining * 0.5 *body.angular_velocity.y(), time_remaining * 0.5 *body.angular_velocity.z()) * body.rotation;
-                final_rotation.vec() += body.rotation.vec();
-                final_rotation.w() += body.rotation.w();
-                final_rotation.normalize();
-                body.rotation = final_rotation;
-            }
+         //   for (auto& body : bodies) {
+              //  body.position += body.velocity * time_remaining;
+               // Eigen::Quaterniond final_rotation = Eigen::Quaterniond(0, time_remaining * 0.5 *body.angular_velocity.x(),  time_remaining * 0.5 *body.angular_velocity.y(), time_remaining * 0.5 *body.angular_velocity.z()) * body.rotation;
+               // final_rotation.vec() += body.rotation.vec();
+              //  final_rotation.w() += body.rotation.w();
+              //  final_rotation.normalize();
+               // body.rotation = final_rotation;
+         //   }
 
 
 
-        }
+      //  }
 
         //todo detect fast rotating objects and give multiple ccd substeps
 
