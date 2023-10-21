@@ -21,6 +21,17 @@ TEST(UTILITY_TESTS, TEST_MESH_REDUCTION) {
     ASSERT_EQ(expected_vertices.size(),reduced_mesh.vertices.size());
     ASSERT_EQ(10,reduced_mesh.edge_indices.size());
 
+    //Ensure that edges are unique
+    for (int j = 0; j < reduced_mesh.edge_indices.size(); j+=2) {
+        auto edge_current = std::minmax(reduced_mesh.edge_indices[j+0], reduced_mesh.edge_indices[j+1]);
+        for (int k = 0; k < reduced_mesh.edge_indices.size(); k += 2) {
+            if(k == j) continue;
+            auto edge_other = std::minmax(reduced_mesh.edge_indices[k+0], reduced_mesh.edge_indices[k+1]);
+            ASSERT_NE(edge_current,edge_other);
+        }
+    }
+
+
     //Check that indices are correct
     for (int j = 0; j < expected_indices.size(); ++j) {
         ASSERT_EQ(expected_indices[j], reduced_mesh.triangle_indices[j]);

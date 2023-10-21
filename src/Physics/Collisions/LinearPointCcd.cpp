@@ -205,10 +205,10 @@ namespace EngiGraph {
     Eigen::Vector3d getNormalEdgeToEdge(const Eigen::Vector3d& a_1, const Eigen::Vector3d& a_2,const Eigen::Vector3d& b_1,const Eigen::Vector3d& b_2){
         auto normal_a = (a_1-a_2).normalized();
         auto normal_b = (b_1-b_2).normalized();
-        if(abs(normal_a.dot(normal_b)) == 1.0 ) {
+        if(abs(normal_a.dot(normal_b)) > 0.999 ) { //Parallel
             auto projected_point_a = a_1 - normal_a*a_1.dot(normal_a);
             auto projected_point_b = b_1 - normal_b*b_1.dot(normal_b);
-            if(projected_point_a == projected_point_b) return {1,0,0};
+            if(projected_point_a == projected_point_b) return {1,0,0}; //todo remove as it should never happen
             return (projected_point_b-projected_point_a).normalized();
         }
         return normal_a.cross(normal_b);
@@ -223,14 +223,15 @@ namespace EngiGraph {
      * @param point_mesh_initial Start transform of point mesh.
      * @param point_mesh_final Target transform of point mesh.
      * @param check_edges Weather or not to do edge to edge detection as well.
-     * @param comparison_delta Max difference between times such that they are considered simultaneous.
+     * @param time_delta Max difference between times such that they are considered simultaneous.
      * @details To check two moving objects, make the motion of one relative to the other.
      * @details To get all collisions between two objects, one must simply run this twice, once with mesh A as points, and once with mesh B as points. Edges only need to be checked once.
      * @return All hits.
      * @warning Assumes that final and initial positions of mesh are not the same.
      */
-    std::vector<CCDHit> linearCCDOneWay(const Mesh &tri_mesh, const Mesh &point_mesh, const Eigen::Matrix4d &point_mesh_initial,  const Eigen::Matrix4d &point_mesh_final, bool check_edges){
+    std::vector<CCDHit> linearCCDOneWay(const Mesh &tri_mesh, const Mesh &point_mesh, const Eigen::Matrix4d &point_mesh_initial,  const Eigen::Matrix4d &point_mesh_final, bool check_edges, double time_delta){
         std::vector<CCDHit> hits;
+        double earliest_time = 1.0;
 
         //Point to face CCD
         for (const auto& local_point : point_mesh.vertices) {
@@ -253,12 +254,18 @@ namespace EngiGraph {
                if(rayTriangleIntersection(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+2]].cast<double>(),
                        point_initial,hit_info,k,s)){
                    double time = hit_info.w() / point_distance;
-                   CCDHit hit{};
-                   hit.time = time;
-                   hit.global_point = hit_info.w() * point_direction + point_initial; //local point for now
-                   hit.normal_a_to_b = getNormal(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+2]].cast<double>());
-                   hit.normal_a_to_b *= hit.normal_a_to_b.dot(point_direction) > 0.0 ? -1.0 : 1.0; //Allow backfaces to have correct normal as well.
-                   hits.push_back(hit);
+                   if(time < earliest_time + time_delta){
+                       if(time < earliest_time - time_delta) {
+                           hits.clear();
+                           earliest_time = time;
+                       }
+                       CCDHit hit{};
+                       hit.time = time;
+                       hit.global_point = hit_info.w() * point_direction + point_initial; //local point for now
+                       hit.normal_a_to_b = getNormal(tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+0]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+1]].cast<double>(),tri_mesh.vertices[tri_mesh.triangle_indices[triangle_index+2]].cast<double>());
+                       hit.normal_a_to_b *= hit.normal_a_to_b.dot(point_direction) > 0.0 ? -1.0 : 1.0; //Allow backfaces to have correct normal as well.
+                       hits.push_back(hit);
+                   }
                }
             }
         }
@@ -289,14 +296,24 @@ namespace EngiGraph {
                     Eigen::Vector3d hit_info{};
                     if(rayQuadPatchIntersection(move_a_init,move_b_init, move_a_final,move_b_final, stay_a,stay_direction,hit_info,stay_edge_length)){
                         double time = hit_info.x(); //u coordinate
-
-                        CCDHit hit{};
-                        hit.time = time;
-                        hit.global_point = stay_a + stay_direction * hit_info.z();
-                        const double normal_rollback = 0.00001f; //slight time offset to prevent equal edges.
-                        hit.normal_a_to_b = getNormalEdgeToEdge(stay_a,stay_b, lerp(move_a_init,move_a_final,time-normal_rollback), lerp(move_b_init,move_b_final,time-normal_rollback));
-                        hit.normal_a_to_b *= hit.normal_a_to_b.dot(move_a_final-move_a_init) > 0.0 ? -1.0 : 1.0; //Allow backfaces to have correct normal as well. In this case we use a point on the original edge to estimate the correct direction.
-                        hits.push_back(hit);
+                        if(time < earliest_time + time_delta) {
+                            if (time < earliest_time - time_delta) {
+                                hits.clear();
+                                earliest_time = time;
+                            }
+                            CCDHit hit{};
+                            hit.time = time;
+                            hit.global_point = stay_a + stay_direction * hit_info.z();
+                            //todo check
+                            const double normal_rollback = 0.0001; //slight time offset to prevent equal edges.
+                            hit.normal_a_to_b = getNormalEdgeToEdge(stay_a, stay_b, lerp(move_a_init, move_a_final,
+                                                                                         time - normal_rollback),
+                                                                    lerp(move_b_init, move_b_final,
+                                                                         time - normal_rollback));
+                            hit.normal_a_to_b *= hit.normal_a_to_b.dot(move_a_final - move_a_init) > 0.0 ? -1.0
+                                                                                                         : 1.0; //Allow backfaces to have correct normal as well. In this case we use a point on the original edge to estimate the correct direction.
+                            hits.push_back(hit);
+                        }
                     }
             }
         }
@@ -305,48 +322,37 @@ namespace EngiGraph {
     }
 
    std::vector<CCDHit> linearCCD(const Mesh &a, const Mesh &b, const Eigen::Matrix4d &a_initial, const Eigen::Matrix4d &b_initial,
-              const Eigen::Matrix4d &a_final, const Eigen::Matrix4d &b_final) {
-
-        if(a_initial == a_final && b_initial == b_final) return {}; //no movement
-        const double delta = 0.0000001; //max delta between simultaneous collisions
+              const Eigen::Matrix4d &a_final, const Eigen::Matrix4d &b_final, double time_delta) {
+        if(a_initial.isApprox(a_final) && b_initial.isApprox( b_final)) return {}; //no movement
 
         //Go both directions
-        std::vector<CCDHit> b_rel_to_a = linearCCDOneWay(a,b, a_initial.inverse() * b_initial,a_final.inverse()*b_final,true);
-        std::vector<CCDHit> a_rel_to_b = linearCCDOneWay(b,a, b_initial.inverse() * a_initial,b_final.inverse()*a_final,false);
+        std::vector<CCDHit> b_rel_to_a = linearCCDOneWay(a,b, a_initial.inverse() * b_initial,a_final.inverse()*b_final,true, time_delta);
+        std::vector<CCDHit> a_rel_to_b = linearCCDOneWay(b,a, b_initial.inverse() * a_initial,b_final.inverse()*a_final,false, time_delta);
 
        //convert to global space
        for (auto& hit : b_rel_to_a) {
-           //todo fix tranform as it must lerp the a_initial as well
-           //it is relative to the object at that point in time. Therefore, it must be transformed by an in between matrix(can be precalculated)
-           hit.global_point = (a_initial * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>();
-           hit.normal_a_to_b = (a_initial.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b;
+           hit.global_point = lerp((a_initial * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>(),(a_final * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>(),hit.time);
+           //todo optimize and check for correct lerp
+           hit.normal_a_to_b = lerp((a_initial.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b,(a_final.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b, hit.time);
        }
        for (auto& hit : a_rel_to_b) {
-           hit.global_point = (b_initial * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>();
-           hit.normal_a_to_b *= -1.0;
-           hit.normal_a_to_b = (b_initial.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b;
+           hit.global_point = lerp((b_initial * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>(),(b_final * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>(),hit.time);
+           hit.normal_a_to_b *= -1.0; //flip such that normal is a to b
+           hit.normal_a_to_b = lerp((b_initial.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b,(b_final.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b, hit.time);
        }
 
-       //todo make this more efficient as this is sorting and transforming a bunch of not needed stuff
+       //Check for earliest time
+       double time_a = b_rel_to_a.empty() ? 1.0 : b_rel_to_a[0].time;
+       double time_b = a_rel_to_b.empty() ? 1.0 : a_rel_to_b[0].time;
 
-       //Get the earliest hit.
-       std::vector<CCDHit> hits = b_rel_to_a;
-       hits.insert(hits.end(), a_rel_to_b.begin(), a_rel_to_b.end());
-       std::sort(hits.begin(), hits.end(), [](const CCDHit& a, const CCDHit& b) { //sort by time in ascending order
-           return a.time < b.time;
-       });
-
-       std::vector<CCDHit> final_hits{};
-       double time = hits[0].time; //todo might access nothing
-       for (const auto& hit : hits) {
-            if(abs(hit.time - time) < delta){
-                final_hits.push_back(hit);
-            }else{
-                break;
-            }
+       if(abs(time_a - time_b) < time_delta){ //Both
+           b_rel_to_a.insert(b_rel_to_a.end(),a_rel_to_b.begin(),a_rel_to_b.end());
+           return b_rel_to_a;
        }
-
-       return final_hits;
+       if(time_a < time_b){ //List a has earlier times
+           return b_rel_to_a;
+       }
+       return a_rel_to_b; //b has earlier times
     }
 
 } // EngiGraph
