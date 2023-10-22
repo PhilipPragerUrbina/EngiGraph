@@ -266,6 +266,8 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
     auto mesh_cube = EngiGraph::stripVisualMesh(raw_mesh_cube[0]);
     auto raw_mesh_sphere = EngiGraph::loadOBJ("./test_files/unit_sphere.obj");
     auto mesh_sphere = EngiGraph::stripVisualMesh(raw_mesh_sphere[0]);
+    auto raw_mesh_torus = EngiGraph::loadOBJ("./test_files/torus.obj");
+    auto mesh_torus = EngiGraph::stripVisualMesh(raw_mesh_torus[0]);
 
     {
         //A cube hits a stationary cube as it moves down the z axis.
@@ -513,15 +515,150 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
         }
     }
 
-    //todo diagonal cube motions miss & hit
+    {
+        //A rotating cube hits a stationary cube as it moves down the z axis.
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0, 0.0, 5.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, 0.0, -5.0}).rotate(Eigen::AngleAxis<double>{EngiGraph::CONSTANT_PI/4.0,Eigen::Vector3d {1.0,0,0.0}}); //rotate 45 degrees over time
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
 
-    //todo rotating objects
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
 
-    //todo objects scaling up or down
+        auto result = EngiGraph::linearCCD(mesh_cube, mesh_cube, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 2);
+        for (const auto &hit: result) {
+            //All the normals should face downward, as a is above b at collision
+            ASSERT_TRUE(hit.normal_a_to_b.dot(Eigen::Vector3d{0.0, 0.0, -1.0}) > 0.9);
+            //Hits must be within the top plane of the cube
+            ASSERT_DOUBLE_EQ(hit.global_point.z(), 1.0);
+            ASSERT_TRUE(hit.global_point.x() <= 1.0 && hit.global_point.x() >= 0.0);
+            ASSERT_TRUE(hit.global_point.y() <= 1.0 && hit.global_point.y() >= 0.0);
+        }
+    }
 
-    //todo torus tests (non convex). Such as fitting a perfectly scaled torus through another.
+    {
+        //A scaling cube hits a stationary cube as it moves down the z axis.
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0, 0.0, 5.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, 0.0, -5.0}).scale(Eigen::Vector3d{1.0,1.0,2.0}); //scale unevenly along axis over time
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
 
-    //todo not super exact test using high speed (high res)sphere in real world situations.
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+
+        auto result = EngiGraph::linearCCD(mesh_cube, mesh_cube, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 4);
+        for (const auto &hit: result) {
+            //All the normals should face downward, as a is above b at collision
+            ASSERT_TRUE(hit.normal_a_to_b.dot(Eigen::Vector3d{0.0, 0.0, -1.0}) > 0.9);
+            //Hits must be within the top plane of the cube
+            ASSERT_DOUBLE_EQ(hit.global_point.z(), 1.0);
+            ASSERT_TRUE(hit.global_point.x() <= 1.0 && hit.global_point.x() >= 0.0);
+            ASSERT_TRUE(hit.global_point.y() <= 1.0 && hit.global_point.y() >= 0.0);
+        }
+    }
+
+    {
+        //A smaller torus goes through a bigger torus. They are moving towards each other.
+        //These are non-convex shapes
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0,5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, -5.0, 0.0}).scale(Eigen::Vector3d{1.0,1.0,2.0}); //scale unevenly along axis over time
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{0.0, -5.0, 0.0}).scale(0.5);
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{0.0, 5.0, 0.0}).scale(0.5);
+        auto result = EngiGraph::linearCCD(mesh_torus, mesh_torus, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 0);
+    }
+    {
+        //A smaller sphere goes through a bigger torus. They are moving towards each other.
+        //These are two different meshes.
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0,5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, -5.0, 0.0}).scale(Eigen::Vector3d{1.0,1.0,2.0}); //scale unevenly along axis over time
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{0.0, -5.0, 0.0}).scale(0.5);
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{0.0, 5.0, 0.0}).scale(0.5);
+        auto result = EngiGraph::linearCCD(mesh_torus, mesh_sphere, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 0);
+    }
+    {
+        //A smaller torus fails to go through a bigger torus. They are moving towards each other.
+        //These are non-convex shapes
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0,5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, -5.0, 0.0}).scale(Eigen::Vector3d{1.0,1.0,2.0}); //scale unevenly along axis over time
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{0.0, -5.0, 0.0}).scale(0.9);
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{0.0, 5.0, 0.0}).scale(0.9);
+        auto result = EngiGraph::linearCCD(mesh_torus, mesh_torus, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_NE(result.size(), 0);
+    }
+    {
+        //Two spheres with fast trajectories miss
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{2.0,5.0, 3.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{20.0, -5.0, -10.0}).scale(Eigen::Vector3d{1.0,1.0,2.0}); //scale unevenly along axis over time
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{0.0, -5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{0.0, 5.0, 0.0});
+        auto result = EngiGraph::linearCCD(mesh_sphere, mesh_sphere, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 0);
+    }
+
+    {
+        //Two spheres with fast arbitrary trajectories hit at end
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{2.0,5.0, 3.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{20.0, -5.0, -10.0}).scale(Eigen::Vector3d{1.0,1.0,2.0}); //scale unevenly along axis over time
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{0.0, -5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{20.0, -5.0, -10.0});
+        auto result = EngiGraph::linearCCD(mesh_sphere, mesh_sphere, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_NE(result.size(), 0);
+    }
+    {
+        //A smaller torus fails to go through a bigger torus. They are moving towards each other.
+        //But this time the hit is outside of time range 0-1
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0,5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, 2.0, 0.0}).scale(Eigen::Vector3d{1.0,1.0,2.0}); //scale unevenly along axis over time
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{0.0, -5.0, 0.0}).scale(0.9);
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{0.0, -2.0, 0.0}).scale(0.9);
+        auto result = EngiGraph::linearCCD(mesh_torus, mesh_torus, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 0);
+    }
+
 
 }
 
