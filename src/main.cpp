@@ -11,6 +11,7 @@
 #include "src/Geometry/MeshConversions.h"
 #include "src/Physics/Collisions/LinearPointCcd.h"
 #include "src/Physics/TOISolver/ToiSolver.h"
+#include "src/Physics/VBD/VbdSolver.h"
 
 #include <GLFW/glfw3.h>
 
@@ -66,31 +67,10 @@ int main(int, char**)
         auto albedo_orange = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_orange.png"));
         auto albedo_blue = EngiGraph::loadTextureOgl(EngiGraph::loadImage("textures/test_blue.png"));
 
-        auto mesh_sphere = EngiGraph::loadOBJ("meshes/unit_sphere.obj")[0];
         auto mesh_cube = EngiGraph::loadOBJ("test_files/cube.obj")[0];
         auto mesh_cube_visual = EngiGraph::loadMeshOgl(mesh_cube);
-        auto mesh_cube_physics = std::make_shared<EngiGraph::Mesh>(EngiGraph::stripVisualMesh(mesh_cube));
-        auto mesh_sphere_visual = EngiGraph::loadMeshOgl(mesh_sphere);
-        auto mesh_sphere_physics = std::make_shared<EngiGraph::Mesh>(EngiGraph::stripVisualMesh(mesh_sphere));
 
-        EngiGraph::TOISolver solver;
-
-
-        solver.bodies.push_back(EngiGraph::TOISolver::RigidBody{
-                {0,6,0},Eigen::Quaterniond::Identity(),{0,0,0},{0,0,0},Eigen::Matrix4d::Identity(), Eigen::Matrix4d::Identity(),mesh_sphere_physics,mesh_sphere_visual,albedo_blue,1.0f,Eigen::Matrix3d::Identity(),{0,0,0}
-        });
-
-        solver.bodies.push_back(EngiGraph::TOISolver::RigidBody{
-                {0,2,0},Eigen::Quaterniond::Identity(),{0,0,0},{0,0,0},Eigen::Matrix4d::Identity(), Eigen::Matrix4d::Identity(),mesh_sphere_physics,mesh_sphere_visual,albedo_blue,1.0f,Eigen::Matrix3d::Identity(),{0,0,0}
-        });
-
-        solver.bodies.push_back(EngiGraph::TOISolver::RigidBody{
-                {0,-2,0},Eigen::Quaterniond::Identity(),{0,0,0},{0,0,0},Eigen::Matrix4d::Identity(), Eigen::Matrix4d::Identity(),mesh_cube_physics,mesh_cube_visual,albedo_orange,1.0f,Eigen::Matrix3d::Identity(),{0,0,0},
-                false
-        });
-
-
-
+        EngiGraph::VBDSolver solver;
 
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
         Eigen::Vector3f cam_pos = {5.0f, 5.0f, 5.0f};
@@ -105,9 +85,12 @@ int main(int, char**)
         int last_width = 500;
         int last_height = 500;
 
-        std::vector<EngiGraph::TOISolver::RigidBody> last_rigidbody_data;
+        std::vector<EngiGraph::VBDSolver::Box> last_rigidbody_data;
 
         float delta_time = 0.01;
+
+        Eigen::Vector3d box_dimensions = {1,1,1};
+        double mass = 1.0;
 
         bool step = false;
 
@@ -125,7 +108,7 @@ int main(int, char**)
 
 
             for (const auto& body : solver.bodies) {
-                pipeline.submitDrawCall(EngiGraph::DeferredPipelineOgl::DrawCall{body.render_mesh,body.render_texture,body.initial_transform.cast<float>()});
+                pipeline.submitDrawCall(EngiGraph::DeferredPipelineOgl::DrawCall{mesh_cube_visual,albedo_blue,body.getRenderTransform().cast<float>()});
             }
             pipeline.render();
 
@@ -143,7 +126,6 @@ int main(int, char**)
                 if(step){
                     if(ImGui::Button("Stop")){
                         solver.bodies = last_rigidbody_data;
-                        solver.step(delta_time);
                         step = false;
                     }
                 }else{
@@ -160,10 +142,9 @@ int main(int, char**)
                     i++;
                     if (ImGui::CollapsingHeader("Body")) {
                         if(ImGui::DragScalarN("Position", ImGuiDataType_Double,body.position.data(),3)){
-                            Eigen::Transform<double,3,Eigen::Affine> transform_initial = Eigen::Transform<double,3,Eigen::Affine>::Identity();
-                            transform_initial.translate(body.position).rotate(body.rotation);
-                            body.initial_transform = transform_initial.matrix();
+                            body.updateCurrentTransform();
                         }
+                        ImGui::DragScalarN("Force", ImGuiDataType_Double,body.force.data(),3);
 
                         ImGui::DragScalarN("Velocity", ImGuiDataType_Double,body.velocity.data(),3);
                         ImGui::DragScalarN("Angular Velocity", ImGuiDataType_Double,body.angular_velocity.data(),3);
@@ -171,7 +152,19 @@ int main(int, char**)
                     ImGui::PopID();
                 }
                 ImGui::Unindent();
+                if(ImGui::CollapsingHeader("New box")){
+                    ImGui::DragScalarN("Box dimensions", ImGuiDataType_Double,box_dimensions.data(),3);
+                    ImGui::DragScalar("Box Mass", ImGuiDataType_Double,&mass);
+
+
+                    if(ImGui::Button("Add box")){
+                        EngiGraph::VBDSolver::Box box{mass,box_dimensions};
+                        solver.bodies.push_back(box);
+                    }
+
+                }
             }
+
 
             if(step){
                 solver.step(delta_time);
