@@ -32,11 +32,12 @@ namespace EngiGraph {
      * @param a_initial,b_initial Global transforms at start of time_step.
      * @param a_final,b_final Global target positions at end of time step.
      * @details Time is 0 at initial and 1 at final.
-     * @param time_delta Max delta between times such that they are no longer considered to be simultaneous.
      * @warning Since this linearly interpolates the movement of vertices, some amount of deformation may happen if transformation rotates points.
      * @return Earliest collision. Will return multiple collision points if they happen at the same time.
      * @details Collision points can include edge to edge, and point to face.
+     * //todo add time delta, point combine delta, and normal rollback as options or constants
+     * @details To avoid a bunch of duplicate collision points, collision points that happen at the same time in very proximity are averaged into a single point.
      */
-    std::vector<CCDHit> linearCCD(const Mesh& a, const Mesh& b, const Eigen::Matrix4d& a_initial, const Eigen::Matrix4d& b_initial,const Eigen::Matrix4d& a_final, const Eigen::Matrix4d& b_final, double time_delta = 0.00001);
+    std::vector<CCDHit> linearCCD(const Mesh& a, const Mesh& b, const Eigen::Matrix4d& a_initial, const Eigen::Matrix4d& b_initial,const Eigen::Matrix4d& a_final, const Eigen::Matrix4d& b_final);
 
 } // EngiGraph

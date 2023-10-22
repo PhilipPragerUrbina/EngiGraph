@@ -6,6 +6,7 @@
 #include "../src/Physics/Collisions/LinearPointCcd.cpp"
 #include "src/FileIO/ObjLoader.h"
 #include "src/Geometry/MeshConversions.h"
+#include "src/Math/Constants.h"
 
 //todo create standardized reliable way to test floating point eigen vectors to ensure deterministic testing
 
@@ -263,6 +264,8 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
     //load resources
     auto raw_mesh_cube = EngiGraph::loadOBJ("./test_files/cube.obj");
     auto mesh_cube = EngiGraph::stripVisualMesh(raw_mesh_cube[0]);
+    auto raw_mesh_sphere = EngiGraph::loadOBJ("./test_files/unit_sphere.obj");
+    auto mesh_sphere = EngiGraph::stripVisualMesh(raw_mesh_sphere[0]);
 
     {
         //A cube hits a stationary cube as it moves down the z axis.
@@ -279,8 +282,7 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
                                            transform_b_initial.matrix(), transform_a_final.matrix(),
                                            transform_b_final.matrix());
 
-        ASSERT_EQ(result.size(),
-                  12); //12 hits should be registered. 4 points from a hitting b. 4 points from b hitting a. And 4 edges hitting each other.
+        ASSERT_EQ(result.size(), 4); //4 collision points, one at each edge
         for (const auto &hit: result) {
             //All the normals should face downward, as a is above b at collision
             ASSERT_TRUE(hit.normal_a_to_b.isApprox(Eigen::Vector3d{0.0, 0.0, -1.0}));
@@ -291,6 +293,45 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
             //hits must be at time 4/10 (cube traveled 4 units out of 10 units down before colliding)
             ASSERT_DOUBLE_EQ(hit.time, 0.4);
         }
+    }
+    {
+        //A smaller cube hits a stationary cube as it moves down the z axis.
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0, 0.0, 5.0}).scale(0.5);
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, 0.0, -5.0}).scale(0.5);
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+
+        auto result = EngiGraph::linearCCD(mesh_cube, mesh_cube, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+
+        ASSERT_EQ(result.size(), 4);
+        for (const auto &hit: result) {
+            ASSERT_TRUE(hit.normal_a_to_b.isApprox(Eigen::Vector3d{0.0, 0.0, -1.0}));
+            ASSERT_DOUBLE_EQ(hit.global_point.z(), 1.0);
+            ASSERT_TRUE(hit.global_point.x() <= 1.0 && hit.global_point.x() >= 0.0);
+            ASSERT_TRUE(hit.global_point.y() <= 1.0 && hit.global_point.y() >= 0.0);
+            ASSERT_DOUBLE_EQ(hit.time, 0.4); //time does not change as the origin of the cube is at the bottom left corner.
+        }
+    }
+    {
+        //A cube misses a stationary cube as it moves down the z axis.
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{2.0, 0.0, 5.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{2.0, 0.0, -5.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+
+        auto result = EngiGraph::linearCCD(mesh_cube, mesh_cube, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+
+        ASSERT_EQ(result.size(), 0);
     }
 
     {
@@ -308,8 +349,7 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
                                            transform_b_initial.matrix(), transform_a_final.matrix(),
                                            transform_b_final.matrix());
 
-        ASSERT_EQ(result.size(),
-                  12); //12 hits should be registered. 4 points from a hitting b. 4 points from b hitting a. And 4 edges hitting each other.
+        ASSERT_EQ(result.size(),4);
         for (const auto &hit: result) {
             //All the normals should face downward, as a is above b at collision
             ASSERT_TRUE(hit.normal_a_to_b.isApprox(Eigen::Vector3d{-1.0, 0.0, 0.0}));
@@ -337,6 +377,31 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
 
         ASSERT_EQ(result.size(), 0);
     }
+    {
+        //A cube does NOT hit a stationary cube as it stays still.
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{1.001, 0.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{1.001, 0.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        auto result = EngiGraph::linearCCD(mesh_cube, mesh_cube, transform_a_initial.matrix(),transform_b_initial.matrix(), transform_a_final.matrix(),transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 0);
+    }
+
+    {
+        //A cube does NOT hit a moving cube as they both move together at the same velocity. (No relative motion)
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{5.0, 0.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{1.0, 0.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{1.0, 0.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{-3.0, 0.0, 0.0});
+        auto result = EngiGraph::linearCCD(mesh_cube, mesh_cube, transform_a_initial.matrix(),transform_b_initial.matrix(), transform_a_final.matrix(),transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 0);
+    }
 
     {
         //A cube hits a stationary cube as it moves down the z axis this time offset on the x axis.
@@ -352,7 +417,7 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
                                            transform_b_initial.matrix(), transform_a_final.matrix(),
                                            transform_b_final.matrix());
 
-        ASSERT_EQ(result.size(), 10); //4 points and two edges no longer contact. 4 new edge contacts present.
+        ASSERT_EQ(result.size(), 6); //Plus two from edge going diagonally through middle of face
         for (const auto &hit: result) {
             //All the normals should face in the downward direction, as a is above b at collision
             ASSERT_TRUE(hit.normal_a_to_b.dot(Eigen::Vector3d{0.0, 0.0, -1.0}) > 0.5);
@@ -364,14 +429,99 @@ TEST(INTERSECTION_TESTS, TEST_LINEAR_CCD) {
             ASSERT_DOUBLE_EQ(hit.time, 0.4);
         }
     }
+    {
+        //Like the first test but with an ico sphere instead.
+        //This is a situation where only one point of contact should happen.
+        //This one is wierd, since two opposite pyramid like structures are touching exactly at the tip.
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0, 5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, -5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
 
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
 
-    //todo false tests
-    //todo true tests
-    //todo edge case tests
-    //todo real world tests
-    //todo targeted tests two way.
-    //todo test strange case with the ghost collisions with the spheres
+        auto result = EngiGraph::linearCCD(mesh_sphere, mesh_sphere, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(),1); //One point should hit.
+        ASSERT_TRUE(result[0].normal_a_to_b.dot(Eigen::Vector3d{0.0, -1.0, 0.0}) > 0.9); //Mostly facing in correct direction.
+        // (As this is the apex of 5 edges exactly touching, it would be impossible to get a perfect normal with floating point)
+        ASSERT_DOUBLE_EQ(result[0].global_point.y(), 1.0); //unit sphere
+        ASSERT_DOUBLE_EQ(result[0].global_point.x(), 0.0);
+        ASSERT_DOUBLE_EQ(result[0].global_point.z(), 0.0);
+        ASSERT_DOUBLE_EQ(result[0].time, 0.3);
+    }
+    {
+        //Now top one fall faster than bottom one
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0, 5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, -5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{0.0, 1.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{0.0, 0.0, 0.0});
+        auto result = EngiGraph::linearCCD(mesh_sphere, mesh_sphere, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(),1); //One point should hit.
+        ASSERT_TRUE(result[0].normal_a_to_b.dot(Eigen::Vector3d{0.0, -1.0, 0.0}) > 0.9); //Mostly facing in correct direction.
+        // (As this is the apex of 5 edges exactly touching, it would be impossible to get a perfect normal with floating point)
+        ASSERT_DOUBLE_EQ(result[0].global_point.x(), 0.0);
+        ASSERT_DOUBLE_EQ(result[0].global_point.z(), 0.0);
+    }
+    {
+        //Now bottom one is faster
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0, 5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, -5.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_initial.translate(Eigen::Vector3d{0.0, 1.0, 0.0});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_b_final.translate(Eigen::Vector3d{0.0, -10.0, 0.0});
+        auto result = EngiGraph::linearCCD(mesh_sphere, mesh_sphere, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(),0);
+    }
+    {
+        //A rotated cube hits a stationary cube as it moves down the z axis.
+        //Remember, the rotation is happening along the bottom left corner!
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_initial.translate(Eigen::Vector3d{0.0, 0.0, 5.0}).rotate(Eigen::AngleAxis<double>{EngiGraph::CONSTANT_PI/4.0,Eigen::Vector3d {1.0,0,0.0}}); //rotate 45 degrees around x axis
+        Eigen::Transform<double, 3, Eigen::Affine> transform_a_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+        transform_a_final.translate(Eigen::Vector3d{0.0, 0.0, -5.0}).rotate(Eigen::AngleAxis<double>{EngiGraph::CONSTANT_PI/4.0,Eigen::Vector3d {1.0,0,0.0}});
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_initial = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+
+        Eigen::Transform<double, 3, Eigen::Affine> transform_b_final = Eigen::Transform<double, 3, Eigen::Affine>::Identity();
+
+        auto result = EngiGraph::linearCCD(mesh_cube, mesh_cube, transform_a_initial.matrix(),
+                                           transform_b_initial.matrix(), transform_a_final.matrix(),
+                                           transform_b_final.matrix());
+        ASSERT_EQ(result.size(), 2);
+        for (const auto &hit: result) {
+            //All the normals should face downward, as a is above b at collision
+            ASSERT_TRUE(hit.normal_a_to_b.dot(Eigen::Vector3d{0.0, 0.0, -1.0}) > 0.9);
+            //Hits must be within the top plane of the cube
+            ASSERT_DOUBLE_EQ(hit.global_point.z(), 1.0);
+            ASSERT_TRUE(hit.global_point.x() <= 1.0 && hit.global_point.x() >= 0.0);
+            ASSERT_TRUE(hit.global_point.y() <= 1.0 && hit.global_point.y() >= 0.0);
+            //hits must be at time 4/10 (cube traveled 4 units out of 10 units down before colliding)
+            ASSERT_DOUBLE_EQ(hit.time, 0.4);
+        }
+    }
+
+    //todo diagonal cube motions miss & hit
+
+    //todo rotating objects
+
+    //todo objects scaling up or down
+
+    //todo torus tests (non convex). Such as fitting a perfectly scaled torus through another.
+
+    //todo not super exact test using high speed (high res)sphere in real world situations.
 
 }
 

@@ -321,8 +321,41 @@ namespace EngiGraph {
         return hits;
     }
 
+    //todo doc
+    std::vector<CCDHit> combineClosePoints(const std::vector<CCDHit>& original_hits, double delta){
+        std::vector<CCDHit> filtered_hits{};
+        std::vector<int> counts{}; //counts for averages
+        for (const auto& hit_original : original_hits) {
+            bool found = false;
+            for (auto& hit_filtered : filtered_hits) {
+                if((hit_filtered.global_point - hit_original.global_point).norm() < delta){
+                    //average the normal
+                    hit_filtered.normal_a_to_b += hit_original.normal_a_to_b;
+                    found = true; //todo ugly
+                    break;
+                }
+            }
+            if(!found){
+                filtered_hits.push_back(hit_original);
+                counts.push_back(1);
+            }
+        }
+        //todo check if ther is a  better way to average normals
+        for (int j = 0; j < filtered_hits.size(); ++j) {
+            filtered_hits[j].normal_a_to_b /= (double)counts[j];
+            filtered_hits[j].normal_a_to_b.normalize();
+        }
+        return filtered_hits;
+    }
+
    std::vector<CCDHit> linearCCD(const Mesh &a, const Mesh &b, const Eigen::Matrix4d &a_initial, const Eigen::Matrix4d &b_initial,
-              const Eigen::Matrix4d &a_final, const Eigen::Matrix4d &b_final, double time_delta) {
+              const Eigen::Matrix4d &a_final, const Eigen::Matrix4d &b_final) {
+        //todo determine time delta and normal rollback from amount of movement
+       const double time_delta = 0.00001;
+       //todo determine this from mesh size and detail
+       const double collision_point_combine_delta = 0.0001;
+
+
         if(a_initial.isApprox(a_final) && b_initial.isApprox( b_final)) return {}; //no movement
 
         //Go both directions
@@ -333,6 +366,7 @@ namespace EngiGraph {
        for (auto& hit : b_rel_to_a) {
            hit.global_point = lerp((a_initial * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>(),(a_final * Eigen::Vector4d(hit.global_point.x(),hit.global_point.y(),hit.global_point.z(),1.0)).head<3>(),hit.time);
            //todo optimize and check for correct lerp
+           //This coule cause problems if an object turns 180 degrees. (0,0,1) + (0,0,-1) = (0,0,0) at t = 0.5
            hit.normal_a_to_b = lerp((a_initial.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b,(a_final.inverse().transpose()).topLeftCorner<3,3>() * hit.normal_a_to_b, hit.time);
        }
        for (auto& hit : a_rel_to_b) {
@@ -347,12 +381,12 @@ namespace EngiGraph {
 
        if(abs(time_a - time_b) < time_delta){ //Both
            b_rel_to_a.insert(b_rel_to_a.end(),a_rel_to_b.begin(),a_rel_to_b.end());
-           return b_rel_to_a;
+           return combineClosePoints(b_rel_to_a,collision_point_combine_delta);
        }
        if(time_a < time_b){ //List a has earlier times
-           return b_rel_to_a;
+           return combineClosePoints(b_rel_to_a,collision_point_combine_delta);
        }
-       return a_rel_to_b; //b has earlier times
+       return combineClosePoints(a_rel_to_b,collision_point_combine_delta); //b has earlier times
     }
 
 } // EngiGraph
